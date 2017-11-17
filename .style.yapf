@@ -1,0 +1,4 @@
+[style]
+based_on_style = google
+blank_line_before_class_docstring = true
+indent_dictionary_value = true
