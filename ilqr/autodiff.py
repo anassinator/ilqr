@@ -74,14 +74,15 @@ def _tensor_map(f, expr):
     return T.stack([f(y) for y in expr])
 
 
-def as_function(expr, inputs):
+def as_function(expr, inputs, **kwargs):
     """Converts and optimizes a Theano expression into a function.
 
     Args:
         expr: Theano tensor expression.
         inputs: List of Theano variables to use as inputs.
+        **kwargs: Additional key-word arguments to pass to `theano.function()`.
 
     Returns:
         A function.
     """
-    return theano.function(inputs, expr, on_unused_input="ignore")
+    return theano.function(inputs, expr, on_unused_input="ignore", **kwargs)

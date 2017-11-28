@@ -149,18 +149,21 @@ class AutoDiffDynamics(Dynamics):
         self._action_size = u_dim
 
         self._J = jacobian_vector(f, self._inputs)
-        self._Q = hessian_vector(f, self._inputs)
 
-        self._f = as_function(f, self._inputs)
+        self._f = as_function(f, self._inputs, name="f")
 
-        self._f_x = as_function(self._J[:, :x_dim], self._inputs)
-        self._f_u = as_function(self._J[:, x_dim:], self._inputs)
+        self._f_x = as_function(self._J[:, :x_dim], self._inputs, name="f_x")
+        self._f_u = as_function(self._J[:, x_dim:], self._inputs, name="f_u")
 
         self._has_hessians = hessians
         if hessians:
-            self._f_xx = as_function(self._Q[:, :x_dim, :x_dim], self._inputs)
-            self._f_ux = as_function(self._Q[:, x_dim:, :x_dim], self._inputs)
-            self._f_uu = as_function(self._Q[:, x_dim:, x_dim:], self._inputs)
+            self._Q = hessian_vector(f, self._inputs)
+            self._f_xx = as_function(
+                self._Q[:, :x_dim, :x_dim], self._inputs, name="f_xx")
+            self._f_ux = as_function(
+                self._Q[:, x_dim:, :x_dim], self._inputs, name="f_ux")
+            self._f_uu = as_function(
+                self._Q[:, x_dim:, x_dim:], self._inputs, name="f_uu")
 
         super(AutoDiffDynamics, self).__init__()
 

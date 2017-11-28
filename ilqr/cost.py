@@ -136,25 +136,29 @@ class AutoDiffCost(Cost):
         self._J = jacobian_scalar(l, self._inputs)
         self._Q = hessian_scalar(l, self._inputs)
 
-        self._l = as_function(l, self._inputs)
+        self._l = as_function(l, self._inputs, name="l")
 
-        self._l_x = as_function(self._J[:x_dim], self._inputs)
-        self._l_u = as_function(self._J[x_dim:], self._inputs)
+        self._l_x = as_function(self._J[:x_dim], self._inputs, name="l_x")
+        self._l_u = as_function(self._J[x_dim:], self._inputs, name="l_u")
 
-        self._l_xx = as_function(self._Q[:x_dim, :x_dim], self._inputs)
-        self._l_ux = as_function(self._Q[x_dim:, :x_dim], self._inputs)
-        self._l_uu = as_function(self._Q[x_dim:, x_dim:], self._inputs)
+        self._l_xx = as_function(
+            self._Q[:x_dim, :x_dim], self._inputs, name="l_xx")
+        self._l_ux = as_function(
+            self._Q[x_dim:, :x_dim], self._inputs, name="l_ux")
+        self._l_uu = as_function(
+            self._Q[x_dim:, x_dim:], self._inputs, name="l_uu")
 
         # Terminal cost only depends on x, so we only need to evaluate the x
         # partial derivatives.
         self._J_terminal = jacobian_scalar(l_terminal, self._x_inputs)
         self._Q_terminal = hessian_scalar(l_terminal, self._x_inputs)
 
-        self._l_terminal = as_function(l_terminal, self._x_inputs)
-        self._l_x_terminal = as_function(self._J_terminal[:x_dim],
-                                         self._x_inputs)
-        self._l_xx_terminal = as_function(self._Q_terminal[:x_dim, :x_dim],
-                                          self._x_inputs)
+        self._l_terminal = as_function(
+            l_terminal, self._x_inputs, name="l_term_xx")
+        self._l_x_terminal = as_function(
+            self._J_terminal[:x_dim], self._x_inputs, name="l_term_ux")
+        self._l_xx_terminal = as_function(
+            self._Q_terminal[:x_dim, :x_dim], self._x_inputs, name="l_term_xx")
 
         super(AutoDiffCost, self).__init__()
 
