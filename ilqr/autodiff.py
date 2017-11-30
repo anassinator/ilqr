@@ -29,7 +29,11 @@ def jacobian_vector(expr, wrt):
     Returns:
         Theano tensor.
     """
-    return _tensor_map(lambda f: jacobian_scalar(f, wrt), expr)
+    try:
+        return _tensor_map(lambda f: jacobian_scalar(f, wrt), expr)
+    except ValueError:
+        # Fallback for wider support.
+        return T.stack([T.jacobian(expr, wrt, disconnected_inputs="ignore")])
 
 
 def hessian_scalar(expr, wrt):
@@ -57,7 +61,11 @@ def hessian_vector(expr, wrt):
     Returns:
         Theano tensor.
     """
-    return _tensor_map(lambda f: hessian_scalar(f, wrt), expr)
+    try:
+        return _tensor_map(lambda f: hessian_scalar(f, wrt), expr)
+    except ValueError:
+        # Fallback for wider support.
+        return T.stack([T.hessian(expr, wrt, disconnected_inputs="ignore")])
 
 
 def _tensor_map(f, expr):
