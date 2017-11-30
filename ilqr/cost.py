@@ -110,7 +110,7 @@ class AutoDiffCost(Cost):
           non-terminal cost needs to be a function of both x and u.
     """
 
-    def __init__(self, l, l_terminal, x_inputs, u_inputs):
+    def __init__(self, l, l_terminal, x_inputs, u_inputs, **kwargs):
         """Constructs an AutoDiffCost.
 
         Args:
@@ -120,6 +120,8 @@ class AutoDiffCost(Cost):
                 This needs to be a function of x only and must retunr a scalar.
             x_inputs: Theano state input variables [state_size].
             u_inputs: Theano action input variables [action_size].
+            **kwargs: Additional keyword-arguments to pass to
+                `theano.function()`.
         """
         self._inputs = x_inputs.copy()
         self._inputs.extend(u_inputs)
@@ -136,17 +138,19 @@ class AutoDiffCost(Cost):
         self._J = jacobian_scalar(l, self._inputs)
         self._Q = hessian_scalar(l, self._inputs)
 
-        self._l = as_function(l, self._inputs, name="l")
+        self._l = as_function(l, self._inputs, name="l", **kwargs)
 
-        self._l_x = as_function(self._J[:x_dim], self._inputs, name="l_x")
-        self._l_u = as_function(self._J[x_dim:], self._inputs, name="l_u")
+        self._l_x = as_function(
+            self._J[:x_dim], self._inputs, name="l_x", **kwargs)
+        self._l_u = as_function(
+            self._J[x_dim:], self._inputs, name="l_u", **kwargs)
 
         self._l_xx = as_function(
-            self._Q[:x_dim, :x_dim], self._inputs, name="l_xx")
+            self._Q[:x_dim, :x_dim], self._inputs, name="l_xx", **kwargs)
         self._l_ux = as_function(
-            self._Q[x_dim:, :x_dim], self._inputs, name="l_ux")
+            self._Q[x_dim:, :x_dim], self._inputs, name="l_ux", **kwargs)
         self._l_uu = as_function(
-            self._Q[x_dim:, x_dim:], self._inputs, name="l_uu")
+            self._Q[x_dim:, x_dim:], self._inputs, name="l_uu", **kwargs)
 
         # Terminal cost only depends on x, so we only need to evaluate the x
         # partial derivatives.
@@ -154,11 +158,17 @@ class AutoDiffCost(Cost):
         self._Q_terminal = hessian_scalar(l_terminal, self._x_inputs)
 
         self._l_terminal = as_function(
-            l_terminal, self._x_inputs, name="l_term_xx")
+            l_terminal, self._x_inputs, name="l_term_xx", **kwargs)
         self._l_x_terminal = as_function(
-            self._J_terminal[:x_dim], self._x_inputs, name="l_term_ux")
+            self._J_terminal[:x_dim],
+            self._x_inputs,
+            name="l_term_ux",
+            **kwargs)
         self._l_xx_terminal = as_function(
-            self._Q_terminal[:x_dim, :x_dim], self._x_inputs, name="l_term_xx")
+            self._Q_terminal[:x_dim, :x_dim],
+            self._x_inputs,
+            name="l_term_xx",
+            **kwargs)
 
         super(AutoDiffCost, self).__init__()
 

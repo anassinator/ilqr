@@ -127,7 +127,7 @@ class AutoDiffDynamics(Dynamics):
 
     """Auto-differentiated Dynamics Model."""
 
-    def __init__(self, f, x_inputs, u_inputs, hessians=False):
+    def __init__(self, f, x_inputs, u_inputs, hessians=False, **kwargs):
         """Constructs an AutoDiffDynamics model.
 
         Args:
@@ -137,6 +137,8 @@ class AutoDiffDynamics(Dynamics):
             hessians: Evaluate the dynamic model's second order derivatives.
                 Default: only use first order derivatives. (i.e. iLQR instead
                 of DDP).
+            **kwargs: Additional keyword-arguments to pass to
+                `theano.function()`.
         """
         self._inputs = np.hstack([x_inputs, u_inputs]).tolist()
 
@@ -150,20 +152,22 @@ class AutoDiffDynamics(Dynamics):
 
         self._J = jacobian_vector(f, self._inputs)
 
-        self._f = as_function(f, self._inputs, name="f")
+        self._f = as_function(f, self._inputs, name="f", **kwargs)
 
-        self._f_x = as_function(self._J[:, :x_dim], self._inputs, name="f_x")
-        self._f_u = as_function(self._J[:, x_dim:], self._inputs, name="f_u")
+        self._f_x = as_function(
+            self._J[:, :x_dim], self._inputs, name="f_x", **kwargs)
+        self._f_u = as_function(
+            self._J[:, x_dim:], self._inputs, name="f_u", **kwargs)
 
         self._has_hessians = hessians
         if hessians:
             self._Q = hessian_vector(f, self._inputs)
             self._f_xx = as_function(
-                self._Q[:, :x_dim, :x_dim], self._inputs, name="f_xx")
+                self._Q[:, :x_dim, :x_dim], self._inputs, name="f_xx", **kwargs)
             self._f_ux = as_function(
-                self._Q[:, x_dim:, :x_dim], self._inputs, name="f_ux")
+                self._Q[:, x_dim:, :x_dim], self._inputs, name="f_ux", **kwargs)
             self._f_uu = as_function(
-                self._Q[:, x_dim:, x_dim:], self._inputs, name="f_uu")
+                self._Q[:, x_dim:, x_dim:], self._inputs, name="f_uu", **kwargs)
 
         super(AutoDiffDynamics, self).__init__()
 
