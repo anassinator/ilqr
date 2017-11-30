@@ -1,8 +1,8 @@
 Iterative Linear Quadratic Regulator
 ====================================
 
-.. image:: https://travis-ci.com/anassinator/ilqr.svg?token=FyA1SHksnNkHz1euHTTi&branch=master
-   :target: https://travis-ci.com/anassinator/ilqr
+.. image:: https://travis-ci.org/anassinator/ilqr.svg?branch=master
+  :target: https://travis-ci.org/anassinator/ilqr
 
 This is an implementation of the Iterative Linear Quadratic Regulator (iLQR)
 for non-linear trajectory optimization based on Yuval Tassa's
