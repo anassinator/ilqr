@@ -35,7 +35,7 @@ class InvertedPendulumDynamics(AutoDiffDynamics):
         Note:
             state: [sin(theta), cos(theta), theta']
             action: [torque]
-            theta: 0 is pointing up and increasing clockwise.
+            theta: pi is pointing up.
         """
         self.constrained = constrain
         self.min_bounds = min_bounds

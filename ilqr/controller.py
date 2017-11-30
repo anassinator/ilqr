@@ -76,7 +76,8 @@ class iLQR(BaseController):
                 (iteration_count, x, J_opt, accepted, converged) -> None
                 where:
                     iteration_count: Current iteration count.
-                    x: Final state.
+                    xs: Current state path.
+                    us: Current action path.
                     J_opt: Optimal cost-to-go.
                     accepted: Whether this iteration yielded an accepted result.
                     converged: Whether this iteration converged successfully.
@@ -141,7 +142,7 @@ class iLQR(BaseController):
                     break
 
             if on_iteration:
-                on_iteration(i, xs[-1], J_opt, accepted, converged)
+                on_iteration(i, xs, us, J_opt, accepted, converged)
 
             if converged:
                 break
