@@ -33,7 +33,7 @@ class iLQR(BaseController):
 
     """Finite Horizon Iterative Linear Quadratic Regulator."""
 
-    def __init__(self, dynamics, cost, T, max_reg=None, hessians=False):
+    def __init__(self, dynamics, cost, T, max_reg=1e10, hessians=False):
         """Constructs an iLQR solver.
 
         Args:
