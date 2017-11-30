@@ -38,7 +38,8 @@ Dynamics model
 ^^^^^^^^^^^^^^
 
 You can set up your own dynamics model by either extending the
-:code:`DynamicsModel` class and hard-coding it and its partial derivatives. Alternatively, you can write it up as a `Theano` expression and use the
+:code:`DynamicsModel` class and hard-coding it and its partial derivatives.
+Alternatively, you can write it up as a `Theano` expression and use the
 :code:`AutoDiffDynamicsModel` class for it to be auto-differentiated.
 
 This is an example of the following dynamics model:
@@ -91,8 +92,9 @@ You can then use this as follows:
   # NOTE: This computes very quickly since the functions were compiled.
   curr_x = np.array([1.0, 2.0])
   curr_u = np.array([0.0])
-  next_x = dynamics.f(curr_x, curr_u)
-  d_dx = dynamics.f_x(curr_x, curr_u)
+  t = 0  # This dynamics model is not time-varying, so this doesn't matter.
+  next_x = dynamics.f(curr_x, curr_u, t)
+  d_dx = dynamics.f_x(curr_x, curr_u, t)
 
 Cost function
 ^^^^^^^^^^^^^
@@ -137,8 +139,8 @@ You can then use this as follows:
 
 .. code-block:: python
 
-  instantaneous_cost = cost.l(curr_x, curr_u)
-  d_dx = cost.l_x(curr_x, curr_u)
+  instantaneous_cost = cost.l(curr_x, curr_u, t)
+  d_dx = cost.l_x(curr_x, curr_u, t)
 
 Putting it all together
 ^^^^^^^^^^^^^^^^^^^^^^^

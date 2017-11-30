@@ -33,12 +33,13 @@ class Dynamics():
         raise NotImplementedError
 
     @abc.abstractmethod
-    def f(self, x, u):
+    def f(self, x, u, t):
         """Dynamics model.
 
         Args:
             x: Current state [state_size].
             u: Current control [control_size].
+            t: Current time step.
 
         Returns:
             Next state [state_size].
@@ -46,12 +47,13 @@ class Dynamics():
         raise NotImplementedError
 
     @abc.abstractmethod
-    def f_x(self, x, u):
+    def f_x(self, x, u, t):
         """Partial derivative of dynamics model with respect to x.
 
         Args:
             x: Current state [state_size].
             u: Current control [control_size].
+            t: Current time step.
 
         Returns:
             df/dx [state_size, state_size].
@@ -59,12 +61,13 @@ class Dynamics():
         raise NotImplementedError
 
     @abc.abstractmethod
-    def f_u(self, x, u):
+    def f_u(self, x, u, t):
         """Partial derivative of dynamics model with respect to u.
 
         Args:
             x: Current state [state_size].
             u: Current control [control_size].
+            t: Current time step.
 
         Returns:
             df/du [state_size, action_size].
@@ -72,7 +75,7 @@ class Dynamics():
         raise NotImplementedError
 
     @abc.abstractmethod
-    def f_xx(self, x, u):
+    def f_xx(self, x, u, t):
         """Second partial derivative of dynamics model with respect to x.
 
         Note:
@@ -82,6 +85,7 @@ class Dynamics():
         Args:
             x: Current state [state_size].
             u: Current control [control_size].
+            t: Current time step.
 
         Returns:
             d^2f/dx^2 [state_size, state_size, state_size].
@@ -89,7 +93,7 @@ class Dynamics():
         raise NotImplementedError
 
     @abc.abstractmethod
-    def f_ux(self, x, u):
+    def f_ux(self, x, u, t):
         """Second partial derivative of dynamics model with respect to u and x.
 
         Note:
@@ -99,6 +103,7 @@ class Dynamics():
         Args:
             x: Current state [state_size].
             u: Current control [control_size].
+            t: Current time step.
 
         Returns:
             d^2f/dudx [state_size, action_size, state_size].
@@ -106,7 +111,7 @@ class Dynamics():
         raise NotImplementedError
 
     @abc.abstractmethod
-    def f_uu(self, x, u):
+    def f_uu(self, x, u, t):
         """Second partial derivative of dynamics model with respect to u.
 
         Note:
@@ -116,6 +121,7 @@ class Dynamics():
         Args:
             x: Current state [state_size].
             u: Current control [control_size].
+            t: Current time step.
 
         Returns:
             d^2f/du^2 [state_size, action_size, action_size].
@@ -127,47 +133,50 @@ class AutoDiffDynamics(Dynamics):
 
     """Auto-differentiated Dynamics Model."""
 
-    def __init__(self, f, x_inputs, u_inputs, hessians=False, **kwargs):
+    def __init__(self, f, x_inputs, u_inputs, t=None, hessians=False, **kwargs):
         """Constructs an AutoDiffDynamics model.
 
         Args:
             f: Vector Theano tensor expression.
             x_inputs: Theano state input variables.
             u_inputs: Theano action input variables.
+            t: Theano tensor time variable.
             hessians: Evaluate the dynamic model's second order derivatives.
                 Default: only use first order derivatives. (i.e. iLQR instead
                 of DDP).
             **kwargs: Additional keyword-arguments to pass to
                 `theano.function()`.
         """
-        self._inputs = np.hstack([x_inputs, u_inputs]).tolist()
-
+        self._t = T.dscalar("t") if t is None else t
         self._x_inputs = x_inputs
         self._u_inputs = u_inputs
+
+        non_t_inputs = np.hstack([x_inputs, u_inputs]).tolist()
+        inputs = np.hstack([x_inputs, u_inputs, self._t]).tolist()
 
         x_dim = len(x_inputs)
         u_dim = len(u_inputs)
         self._state_size = x_dim
         self._action_size = u_dim
 
-        self._J = jacobian_vector(f, self._inputs)
+        self._J = jacobian_vector(f, non_t_inputs)
 
-        self._f = as_function(f, self._inputs, name="f", **kwargs)
+        self._f = as_function(f, inputs, name="f", **kwargs)
 
         self._f_x = as_function(
-            self._J[:, :x_dim], self._inputs, name="f_x", **kwargs)
+            self._J[:, :x_dim], inputs, name="f_x", **kwargs)
         self._f_u = as_function(
-            self._J[:, x_dim:], self._inputs, name="f_u", **kwargs)
+            self._J[:, x_dim:], inputs, name="f_u", **kwargs)
 
         self._has_hessians = hessians
         if hessians:
-            self._Q = hessian_vector(f, self._inputs)
+            self._Q = hessian_vector(f, non_t_inputs)
             self._f_xx = as_function(
-                self._Q[:, :x_dim, :x_dim], self._inputs, name="f_xx", **kwargs)
+                self._Q[:, :x_dim, :x_dim], inputs, name="f_xx", **kwargs)
             self._f_ux = as_function(
-                self._Q[:, x_dim:, :x_dim], self._inputs, name="f_ux", **kwargs)
+                self._Q[:, x_dim:, :x_dim], inputs, name="f_ux", **kwargs)
             self._f_uu = as_function(
-                self._Q[:, x_dim:, x_dim:], self._inputs, name="f_uu", **kwargs)
+                self._Q[:, x_dim:, x_dim:], inputs, name="f_uu", **kwargs)
 
         super(AutoDiffDynamics, self).__init__()
 
@@ -196,51 +205,60 @@ class AutoDiffDynamics(Dynamics):
         """The control variables."""
         return self._u_inputs
 
-    def f(self, x, u):
+    @property
+    def t(self):
+        """The time variable."""
+        return self._t
+
+    def f(self, x, u, t):
         """Dynamics model.
 
         Args:
             x: Current state [state_size].
             u: Current control [control_size].
+            t: Current time step.
 
         Returns:
             Next state [state_size].
         """
-        z = np.hstack([x, u])
+        z = np.hstack([x, u, t])
         return self._f(*z)
 
-    def f_x(self, x, u):
+    def f_x(self, x, u, t):
         """Partial derivative of dynamics model with respect to x.
 
         Args:
             x: Current state [state_size].
             u: Current control [control_size].
+            t: Current time step.
 
         Returns:
             df/dx [state_size, state_size].
         """
-        z = np.hstack([x, u])
+        z = np.hstack([x, u, t])
         return self._f_x(*z)
 
-    def f_u(self, x, u):
+    def f_u(self, x, u, t):
         """Partial derivative of dynamics model with respect to u.
 
         Args:
             x: Current state [state_size].
             u: Current control [control_size].
+            t: Current time step.
 
         Returns:
             df/du [state_size, action_size].
         """
-        z = np.hstack([x, u])
+        z = np.hstack([x, u, t])
         return self._f_u(*z)
 
-    def f_xx(self, x, u):
+    def f_xx(self, x, u, t):
         """Second partial derivative of dynamics model with respect to x.
 
         Args:
             x: Current state [state_size].
             u: Current control [control_size].
+            t: Current time step.
 
         Returns:
             d^2f/dx^2 [state_size, state_size, state_size].
@@ -248,15 +266,16 @@ class AutoDiffDynamics(Dynamics):
         if not self._has_hessians:
             raise NotImplementedError
 
-        z = np.hstack([x, u])
+        z = np.hstack([x, u, t])
         return self._f_xx(*z)
 
-    def f_ux(self, x, u):
+    def f_ux(self, x, u, t):
         """Second partial derivative of dynamics model with respect to u and x.
 
         Args:
             x: Current state [state_size].
             u: Current control [control_size].
+            t: Current time step.
 
         Returns:
             d^2f/dudx [state_size, action_size, state_size].
@@ -264,15 +283,16 @@ class AutoDiffDynamics(Dynamics):
         if not self._has_hessians:
             raise NotImplementedError
 
-        z = np.hstack([x, u])
+        z = np.hstack([x, u, t])
         return self._f_ux(*z)
 
-    def f_uu(self, x, u):
+    def f_uu(self, x, u, t):
         """Second partial derivative of dynamics model with respect to u.
 
         Args:
             x: Current state [state_size].
             u: Current control [control_size].
+            t: Current time step.
 
         Returns:
             d^2f/du^2 [state_size, action_size, action_size].
@@ -280,7 +300,7 @@ class AutoDiffDynamics(Dynamics):
         if not self._has_hessians:
             raise NotImplementedError
 
-        z = np.hstack([x, u])
+        z = np.hstack([x, u, t])
         return self._f_uu(*z)
 
 

@@ -180,7 +180,7 @@ class iLQR(BaseController):
             us_new[t] = us[t] + alpha * (k[t] + K[t].dot(xs_new[t] - xs[t]))
 
             # Eq (8c).
-            xs_new[t + 1] = self.dynamics.f(xs_new[t], us_new[t])
+            xs_new[t + 1] = self.dynamics.f(xs_new[t], us_new[t], t)
 
         return xs_new, us_new
 
@@ -194,8 +194,9 @@ class iLQR(BaseController):
         Returns:
             Trajectory's total cost.
         """
-        J = map(lambda args: self.cost.l(*args), zip(xs[:-1], us))
-        return sum(J) + self.cost.l(xs[-1], None, terminal=True)
+        J = map(lambda args: self.cost.l(*args), zip(xs[:-1], us,
+                                                     range(self.T)))
+        return sum(J) + self.cost.l(xs[-1], None, self.T, terminal=True)
 
     def _forward_rollout(self, x0, us):
         """Apply the forward dynamics to have a trajectory from the starting
@@ -210,7 +211,7 @@ class iLQR(BaseController):
         """
         xs = np.array([x0])
         for t in range(self.T):
-            x_new = self.dynamics.f(xs[-1], us[t])
+            x_new = self.dynamics.f(xs[-1], us[t], t)
             xs = np.append(xs, [x_new], axis=0)
 
         return xs
@@ -227,8 +228,8 @@ class iLQR(BaseController):
                 k: feedforward gains [T, action_size].
                 K: feedback gains [T, action_size, state_size].
         """
-        V_x = self.cost.l_x(xs[-1], None, terminal=True)
-        V_xx = self.cost.l_xx(xs[-1], None, terminal=True)
+        V_x = self.cost.l_x(xs[-1], None, self.T, terminal=True)
+        V_xx = self.cost.l_xx(xs[-1], None, self.T, terminal=True)
 
         k = [None] * self.T
         K = [None] * self.T
@@ -237,7 +238,7 @@ class iLQR(BaseController):
             x = xs[t]
             u = us[t]
 
-            Q_x, Q_u, Q_xx, Q_ux, Q_uu = self._Q(x, u, V_x, V_xx)
+            Q_x, Q_u, Q_xx, Q_ux, Q_uu = self._Q(x, u, V_x, V_xx, t)
             Q_uu_inv = np.linalg.pinv(Q_uu)
 
             # Eq (6).
@@ -255,7 +256,7 @@ class iLQR(BaseController):
 
         return np.array(k), np.array(K)
 
-    def _Q(self, x, u, V_x, V_xx):
+    def _Q(self, x, u, V_x, V_xx, t):
         """Computes second order expansion.
 
         Args:
@@ -264,6 +265,7 @@ class iLQR(BaseController):
             V_x: d/dx of the value function at the next time step [state_size].
             V_xx: d^2/dx^2 of the value function at the next time step
                 [state_size, state_size].
+            t: Current time step.
 
         Returns:
             Tuple of
@@ -273,14 +275,14 @@ class iLQR(BaseController):
                 Q_ux: [action_size, state_size].
                 Q_uu: [action_size, action_size].
         """
-        f_x = self.dynamics.f_x(x, u)
-        f_u = self.dynamics.f_u(x, u)
+        f_x = self.dynamics.f_x(x, u, t)
+        f_u = self.dynamics.f_u(x, u, t)
 
-        l_x = self.cost.l_x(x, u)
-        l_u = self.cost.l_u(x, u)
-        l_xx = self.cost.l_xx(x, u)
-        l_ux = self.cost.l_ux(x, u)
-        l_uu = self.cost.l_uu(x, u)
+        l_x = self.cost.l_x(x, u, t)
+        l_u = self.cost.l_u(x, u, t)
+        l_xx = self.cost.l_xx(x, u, t)
+        l_ux = self.cost.l_ux(x, u, t)
+        l_uu = self.cost.l_uu(x, u, t)
 
         # Eqs (5a), (5b) and (5c).
         Q_x = l_x + f_x.T.dot(V_x)
@@ -293,9 +295,9 @@ class iLQR(BaseController):
         Q_uu = l_uu + f_u.T.dot(V_xx + reg).dot(f_u)
 
         if self._use_hessians:
-            f_xx = self.dynamics.f_xx(x, u)
-            f_ux = self.dynamics.f_ux(x, u)
-            f_uu = self.dynamics.f_uu(x, u)
+            f_xx = self.dynamics.f_xx(x, u, t)
+            f_ux = self.dynamics.f_ux(x, u, t)
+            f_uu = self.dynamics.f_uu(x, u, t)
 
             Q_xx += np.tensordot(V_x, f_xx, axes=1)
             Q_ux += np.tensordot(V_x, f_ux, axes=1)

@@ -13,17 +13,18 @@ class Cost():
 
     """Instantaneous Cost.
 
-    NOTE: The terminal cost needs to be a function of x only, whereas the
-          non-terminal cost needs to be a function of both x and u.
+    NOTE: The terminal cost needs to at most be a function of x and t, whereas
+          the non-terminal cost can be a function of x, u and t.
     """
 
     @abc.abstractmethod
-    def l(self, x, u, terminal=False):
+    def l(self, x, u, t, terminal=False):
         """Instantaneous cost function.
 
         Args:
             x: Current state [state_size].
             u: Current control [action_size]. None if terminal.
+            t: Current time step.
             terminal: Compute terminal cost. Default: False.
 
         Returns:
@@ -32,12 +33,13 @@ class Cost():
         raise NotImplementedError
 
     @abc.abstractmethod
-    def l_x(self, x, u, terminal=False):
+    def l_x(self, x, u, t, terminal=False):
         """Partial derivative of cost function with respect to x.
 
         Args:
             x: Current state [state_size].
             u: Current control [action_size]. None if terminal.
+            t: Current time step.
             terminal: Compute terminal cost. Default: False.
 
         Returns:
@@ -46,12 +48,13 @@ class Cost():
         raise NotImplementedError
 
     @abc.abstractmethod
-    def l_u(self, x, u, terminal=False):
+    def l_u(self, x, u, t, terminal=False):
         """Partial derivative of cost function with respect to u.
 
         Args:
             x: Current state [state_size].
             u: Current control [action_size]. None if terminal.
+            t: Current time step.
             terminal: Compute terminal cost. Default: False.
 
         Returns:
@@ -60,12 +63,13 @@ class Cost():
         raise NotImplementedError
 
     @abc.abstractmethod
-    def l_xx(self, x, u, terminal=False):
+    def l_xx(self, x, u, t, terminal=False):
         """Second partial derivative of cost function with respect to x.
 
         Args:
             x: Current state [state_size].
             u: Current control [action_size]. None if terminal.
+            t: Current time step.
             terminal: Compute terminal cost. Default: False.
 
         Returns:
@@ -74,12 +78,13 @@ class Cost():
         raise NotImplementedError
 
     @abc.abstractmethod
-    def l_ux(self, x, u, terminal=False):
+    def l_ux(self, x, u, t, terminal=False):
         """Second partial derivative of cost function with respect to u and x.
 
         Args:
             x: Current state [state_size].
             u: Current control [action_size]. None if terminal.
+            t: Current time step.
             terminal: Compute terminal cost. Default: False.
 
         Returns:
@@ -88,12 +93,13 @@ class Cost():
         raise NotImplementedError
 
     @abc.abstractmethod
-    def l_uu(self, x, u, terminal=False):
+    def l_uu(self, x, u, t, terminal=False):
         """Second partial derivative of cost function with respect to u.
 
         Args:
             x: Current state [state_size].
             u: Current control [action_size]. None if terminal.
+            t: Current time step.
             terminal: Compute terminal cost. Default: False.
 
         Returns:
@@ -106,11 +112,11 @@ class AutoDiffCost(Cost):
 
     """Auto-differentiated Instantaneous Cost.
 
-    NOTE: The terminal cost needs to be a function of x only, whereas the
-          non-terminal cost needs to be a function of both x and u.
+    NOTE: The terminal cost needs to at most be a function of x and t, whereas
+          the non-terminal cost can be a function of x, u and t.
     """
 
-    def __init__(self, l, l_terminal, x_inputs, u_inputs, **kwargs):
+    def __init__(self, l, l_terminal, x_inputs, u_inputs, t=None, **kwargs):
         """Constructs an AutoDiffCost.
 
         Args:
@@ -120,14 +126,17 @@ class AutoDiffCost(Cost):
                 This needs to be a function of x only and must retunr a scalar.
             x_inputs: Theano state input variables [state_size].
             u_inputs: Theano action input variables [action_size].
+            t: Theano tensor time variable.
             **kwargs: Additional keyword-arguments to pass to
                 `theano.function()`.
         """
-        self._inputs = x_inputs.copy()
-        self._inputs.extend(u_inputs)
-
+        self._t = T.dscalar("t") if t is None else t
         self._x_inputs = x_inputs
         self._u_inputs = u_inputs
+
+        non_t_inputs = np.hstack([x_inputs, u_inputs]).tolist()
+        inputs = np.hstack([x_inputs, u_inputs, self._t]).tolist()
+        terminal_inputs = np.hstack([x_inputs, self._t]).tolist()
 
         x_dim = len(x_inputs)
         u_dim = len(u_inputs)
@@ -135,38 +144,36 @@ class AutoDiffCost(Cost):
         self._state_size = x_dim
         self._action_size = u_dim
 
-        self._J = jacobian_scalar(l, self._inputs)
-        self._Q = hessian_scalar(l, self._inputs)
+        self._J = jacobian_scalar(l, non_t_inputs)
+        self._Q = hessian_scalar(l, non_t_inputs)
 
-        self._l = as_function(l, self._inputs, name="l", **kwargs)
+        self._l = as_function(l, inputs, name="l", **kwargs)
 
-        self._l_x = as_function(
-            self._J[:x_dim], self._inputs, name="l_x", **kwargs)
-        self._l_u = as_function(
-            self._J[x_dim:], self._inputs, name="l_u", **kwargs)
+        self._l_x = as_function(self._J[:x_dim], inputs, name="l_x", **kwargs)
+        self._l_u = as_function(self._J[x_dim:], inputs, name="l_u", **kwargs)
 
         self._l_xx = as_function(
-            self._Q[:x_dim, :x_dim], self._inputs, name="l_xx", **kwargs)
+            self._Q[:x_dim, :x_dim], inputs, name="l_xx", **kwargs)
         self._l_ux = as_function(
-            self._Q[x_dim:, :x_dim], self._inputs, name="l_ux", **kwargs)
+            self._Q[x_dim:, :x_dim], inputs, name="l_ux", **kwargs)
         self._l_uu = as_function(
-            self._Q[x_dim:, x_dim:], self._inputs, name="l_uu", **kwargs)
+            self._Q[x_dim:, x_dim:], inputs, name="l_uu", **kwargs)
 
         # Terminal cost only depends on x, so we only need to evaluate the x
         # partial derivatives.
-        self._J_terminal = jacobian_scalar(l_terminal, self._x_inputs)
-        self._Q_terminal = hessian_scalar(l_terminal, self._x_inputs)
+        self._J_terminal = jacobian_scalar(l_terminal, x_inputs)
+        self._Q_terminal = hessian_scalar(l_terminal, x_inputs)
 
         self._l_terminal = as_function(
-            l_terminal, self._x_inputs, name="l_term_xx", **kwargs)
+            l_terminal, terminal_inputs, name="l_term_xx", **kwargs)
         self._l_x_terminal = as_function(
             self._J_terminal[:x_dim],
-            self._x_inputs,
+            terminal_inputs,
             name="l_term_ux",
             **kwargs)
         self._l_xx_terminal = as_function(
             self._Q_terminal[:x_dim, :x_dim],
-            self._x_inputs,
+            terminal_inputs,
             name="l_term_xx",
             **kwargs)
 
@@ -182,46 +189,56 @@ class AutoDiffCost(Cost):
         """The control variables."""
         return self._u_inputs
 
-    def l(self, x, u, terminal=False):
+    @property
+    def t(self):
+        """The time variable."""
+        return self._t
+
+    def l(self, x, u, t, terminal=False):
         """Instantaneous cost function.
 
         Args:
             x: Current state [state_size].
             u: Current control [action_size]. None if terminal.
+            t: Current time step.
             terminal: Compute terminal cost. Default: False.
 
         Returns:
             Instantaneous cost (scalar).
         """
         if terminal:
-            return np.asscalar(self._l_terminal(*x))
+            z = np.hstack([x, t])
+            return np.asscalar(self._l_terminal(*z))
 
-        z = np.hstack([x, u])
+        z = np.hstack([x, u, t])
         return np.asscalar(self._l(*z))
 
-    def l_x(self, x, u, terminal=False):
+    def l_x(self, x, u, t, terminal=False):
         """Partial derivative of cost function with respect to x.
 
         Args:
             x: Current state [state_size].
             u: Current control [action_size]. None if terminal.
+            t: Current time step.
             terminal: Compute terminal cost. Default: False.
 
         Returns:
             dl/dx [state_size].
         """
         if terminal:
-            return np.array(self._l_x_terminal(*x))
+            z = np.hstack([x, t])
+            return np.array(self._l_x_terminal(*z))
 
-        z = np.hstack([x, u])
+        z = np.hstack([x, u, t])
         return np.array(self._l_x(*z))
 
-    def l_u(self, x, u, terminal=False):
+    def l_u(self, x, u, t, terminal=False):
         """Partial derivative of cost function with respect to u.
 
         Args:
             x: Current state [state_size].
             u: Current control [action_size]. None if terminal.
+            t: Current time step.
             terminal: Compute terminal cost. Default: False.
 
         Returns:
@@ -231,32 +248,35 @@ class AutoDiffCost(Cost):
             # Not a function of u, so the derivative is zero.
             return np.zeros(self._action_size)
 
-        z = np.hstack([x, u])
+        z = np.hstack([x, u, t])
         return np.array(self._l_u(*z))
 
-    def l_xx(self, x, u, terminal=False):
+    def l_xx(self, x, u, t, terminal=False):
         """Second partial derivative of cost function with respect to x.
 
         Args:
             x: Current state [state_size].
             u: Current control [action_size]. None if terminal.
+            t: Current time step.
             terminal: Compute terminal cost. Default: False.
 
         Returns:
             d^2l/dx^2 [state_size, state_size].
         """
         if terminal:
-            return np.array(self._l_xx_terminal(*x))
+            z = np.hstack([x, t])
+            return np.array(self._l_xx_terminal(*z))
 
-        z = np.hstack([x, u])
+        z = np.hstack([x, u, t])
         return np.array(self._l_xx(*z))
 
-    def l_ux(self, x, u, terminal=False):
+    def l_ux(self, x, u, t, terminal=False):
         """Second partial derivative of cost function with respect to u and x.
 
         Args:
             x: Current state [state_size].
             u: Current control [action_size]. None if terminal.
+            t: Current time step.
             terminal: Compute terminal cost. Default: False.
 
         Returns:
@@ -266,15 +286,16 @@ class AutoDiffCost(Cost):
             # Not a function of u, so the derivative is zero.
             return np.zeros((self._action_size, self._state_size))
 
-        z = np.hstack([x, u])
+        z = np.hstack([x, u, t])
         return np.array(self._l_ux(*z))
 
-    def l_uu(self, x, u, terminal=False):
+    def l_uu(self, x, u, t, terminal=False):
         """Second partial derivative of cost function with respect to u.
 
         Args:
             x: Current state [state_size].
             u: Current control [action_size]. None if terminal.
+            t: Current time step.
             terminal: Compute terminal cost. Default: False.
 
         Returns:
@@ -284,7 +305,7 @@ class AutoDiffCost(Cost):
             # Not a function of u, so the derivative is zero.
             return np.zeros((self._action_size, self._action_size))
 
-        z = np.hstack([x, u])
+        z = np.hstack([x, u, t])
         return np.array(self._l_uu(*z))
 
 
@@ -334,12 +355,13 @@ class QRCost(Cost):
 
         super(QRCost, self).__init__()
 
-    def l(self, x, u, terminal=False):
+    def l(self, x, u, t, terminal=False):
         """Instantaneous cost function.
 
         Args:
             x: Current state [state_size].
             u: Current control [action_size]. None if terminal.
+            t: Current time step.
             terminal: Compute terminal cost. Default: False.
 
         Returns:
@@ -356,12 +378,13 @@ class QRCost(Cost):
         u_diff = u - self.u_goal
         return squared_x_cost + u_diff.T.dot(R).dot(u_diff)
 
-    def l_x(self, x, u, terminal=False):
+    def l_x(self, x, u, t, terminal=False):
         """Partial derivative of cost function with respect to x.
 
         Args:
             x: Current state [state_size].
             u: Current control [action_size]. None if terminal.
+            t: Current time step.
             terminal: Compute terminal cost. Default: False.
 
         Returns:
@@ -371,12 +394,13 @@ class QRCost(Cost):
         x_diff = x - self.x_goal
         return x_diff.T.dot(Q_plus_Q_T)
 
-    def l_u(self, x, u, terminal=False):
+    def l_u(self, x, u, t, terminal=False):
         """Partial derivative of cost function with respect to u.
 
         Args:
             x: Current state [state_size].
             u: Current control [action_size]. None if terminal.
+            t: Current time step.
             terminal: Compute terminal cost. Default: False.
 
         Returns:
@@ -388,12 +412,13 @@ class QRCost(Cost):
         u_diff = u - self.u_goal
         return u_diff.T.dot(self._R_plus_R_T)
 
-    def l_xx(self, x, u, terminal=False):
+    def l_xx(self, x, u, t, terminal=False):
         """Second partial derivative of cost function with respect to x.
 
         Args:
             x: Current state [state_size].
             u: Current control [action_size]. None if terminal.
+            t: Current time step.
             terminal: Compute terminal cost. Default: False.
 
         Returns:
@@ -401,12 +426,13 @@ class QRCost(Cost):
         """
         return self._Q_plus_Q_T_terminal if terminal else self._Q_plus_Q_T
 
-    def l_ux(self, x, u, terminal=False):
+    def l_ux(self, x, u, t, terminal=False):
         """Second partial derivative of cost function with respect to u and x.
 
         Args:
             x: Current state [state_size].
             u: Current control [action_size]. None if terminal.
+            t: Current time step.
             terminal: Compute terminal cost. Default: False.
 
         Returns:
@@ -414,12 +440,13 @@ class QRCost(Cost):
         """
         return np.zeros((self.R.shape[0], self.Q.shape[0]))
 
-    def l_uu(self, x, u, terminal=False):
+    def l_uu(self, x, u, t, terminal=False):
         """Second partial derivative of cost function with respect to u.
 
         Args:
             x: Current state [state_size].
             u: Current control [action_size]. None if terminal.
+            t: Current time step.
             terminal: Compute terminal cost. Default: False.
 
         Returns:
