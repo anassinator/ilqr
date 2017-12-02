@@ -341,6 +341,9 @@ class RecedingHorizonController(object):
         the entire control path computed. Should you want to correct this state
         between iterations, simply use the `set_state()` method.
 
+        Note: If your cost or dynamics are time dependent, then you might need
+        to shift their internal state accordingly.
+
         Args:
             us_init: Initial control path [T, action_size].
             step_size: Number of steps between each controller fit. Default: 1.
