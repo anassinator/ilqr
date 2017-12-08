@@ -320,6 +320,10 @@ class FiniteDifferenceDynamics(Dynamics):
                 Default: np.sqrt(np.finfo(float).eps).
             u_eps: Increment to the action to use when estimating the gradient.
                 Default: np.sqrt(np.finfo(float).eps).
+
+        Note:
+            The square root of the provided epsilons are used when computing
+            the Hessians instead.
         """
         self._f = f
         self._state_size = state_size
@@ -343,7 +347,7 @@ class FiniteDifferenceDynamics(Dynamics):
     @property
     def has_hessians(self):
         """Whether the second order derivatives are available."""
-        return False
+        return True
 
     def f(self, x, u, t):
         """Dynamics model.
@@ -403,7 +407,17 @@ class FiniteDifferenceDynamics(Dynamics):
         Returns:
             d^2f/dx^2 [state_size, state_size, state_size].
         """
-        raise NotImplementedError
+        # yapf: disable
+        Q = np.array([
+            [
+                approx_fprime(x, lambda x: self.f_x(x, u, t)[i, j],
+                              np.sqrt(self._x_eps))
+                for j in range(self._state_size)
+            ]
+            for i in range(self._state_size)
+        ])
+        # yapf: enable
+        return Q
 
     def f_ux(self, x, u, t):
         """Second partial derivative of dynamics model with respect to u and x.
@@ -416,7 +430,17 @@ class FiniteDifferenceDynamics(Dynamics):
         Returns:
             d^2f/dudx [state_size, action_size, state_size].
         """
-        raise NotImplementedError
+        # yapf: disable
+        Q = np.array([
+            [
+                approx_fprime(x, lambda x: self.f_u(x, u, t)[i, j],
+                              np.sqrt(self._x_eps))
+                for j in range(self._action_size)
+            ]
+            for i in range(self._state_size)
+        ])
+        # yapf: enable
+        return Q
 
     def f_uu(self, x, u, t):
         """Second partial derivative of dynamics model with respect to u.
@@ -429,7 +453,17 @@ class FiniteDifferenceDynamics(Dynamics):
         Returns:
             d^2f/du^2 [state_size, action_size, action_size].
         """
-        raise NotImplementedError
+        # yapf: disable
+        Q = np.array([
+            [
+                approx_fprime(u, lambda u: self.f_u(x, u, t)[i, j],
+                              np.sqrt(self._u_eps))
+                for j in range(self._action_size)
+            ]
+            for i in range(self._state_size)
+        ])
+        # yapf: enable
+        return Q
 
 
 def constrain(u, min_bounds, max_bounds):
