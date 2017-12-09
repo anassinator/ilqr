@@ -148,9 +148,12 @@ Cost function
 Similarly, you can set up your own cost function by either extending the
 :code:`Cost` class and hard-coding it and its partial derivatives.
 Alternatively, you can write it up as a `Theano` expression and use the
-:code:`AutoDiffCost` class for it to be auto-differentiated.
+:code:`AutoDiffCost` class for it to be auto-differentiated. Finally, if all
+you have are a loss functions, you can use the :code:`FiniteDiffCost` class to
+approximate the derivatives with finite difference approximation.
 
-The most common cost function is the quadratic format used by Linear Quadratic Regulators:
+The most common cost function is the quadratic format used by Linear Quadratic
+Regulators:
 
 .. math::
 

@@ -5,6 +5,7 @@ import six
 import abc
 import numpy as np
 import theano.tensor as T
+from scipy.optimize import approx_fprime
 from .autodiff import as_function, hessian_scalar, jacobian_scalar
 
 
@@ -307,6 +308,171 @@ class AutoDiffCost(Cost):
 
         z = np.hstack([x, u, t])
         return np.array(self._l_uu(*z))
+
+
+class FiniteDiffCost(Cost):
+
+    """Finite difference approximated Instantaneous Cost.
+
+    NOTE: The terminal cost needs to at most be a function of x and t, whereas
+          the non-terminal cost can be a function of x, u and t.
+    """
+
+    def __init__(self,
+                 l,
+                 l_terminal,
+                 state_size,
+                 action_size,
+                 x_eps=None,
+                 u_eps=None):
+        """Constructs an FiniteDiffCost.
+
+        Args:
+            l: Instantaneous cost function to approximate.
+                Signature: (x, u, t) -> scalar.
+            l_terminal: Terminal cost function to approximate.
+                Signature: (x, t) -> scalar.
+            state_size: State size.
+            action_size: Action size.
+            x_eps: Increment to the state to use when estimating the gradient.
+                Default: np.sqrt(np.finfo(float).eps).
+            u_eps: Increment to the action to use when estimating the gradient.
+                Default: np.sqrt(np.finfo(float).eps).
+
+        Note:
+            The square root of the provided epsilons are used when computing
+            the Hessians instead.
+        """
+        self._l = l
+        self._l_terminal = l_terminal
+        self._state_size = state_size
+        self._action_size = action_size
+
+        self._x_eps = x_eps if x_eps else np.sqrt(np.finfo(float).eps)
+        self._u_eps = u_eps if x_eps else np.sqrt(np.finfo(float).eps)
+
+        self._x_eps_hess = np.sqrt(self._x_eps)
+        self._u_eps_hess = np.sqrt(self._u_eps)
+
+        super(FiniteDiffCost, self).__init__()
+
+    def l(self, x, u, t, terminal=False):
+        """Instantaneous cost function.
+
+        Args:
+            x: Current state [state_size].
+            u: Current control [action_size]. None if terminal.
+            t: Current time step.
+            terminal: Compute terminal cost. Default: False.
+
+        Returns:
+            Instantaneous cost (scalar).
+        """
+        if terminal:
+            return self._l_terminal(x, t)
+
+        return self._l(x, u, t)
+
+    def l_x(self, x, u, t, terminal=False):
+        """Partial derivative of cost function with respect to x.
+
+        Args:
+            x: Current state [state_size].
+            u: Current control [action_size]. None if terminal.
+            t: Current time step.
+            terminal: Compute terminal cost. Default: False.
+
+        Returns:
+            dl/dx [state_size].
+        """
+        if terminal:
+            return approx_fprime(x, lambda x: self._l_terminal(x, t),
+                                 self._x_eps)
+
+        return approx_fprime(x, lambda x: self._l(x, u, t), self._x_eps)
+
+    def l_u(self, x, u, t, terminal=False):
+        """Partial derivative of cost function with respect to u.
+
+        Args:
+            x: Current state [state_size].
+            u: Current control [action_size]. None if terminal.
+            t: Current time step.
+            terminal: Compute terminal cost. Default: False.
+
+        Returns:
+            dl/du [action_size].
+        """
+        if terminal:
+            # Not a function of u, so the derivative is zero.
+            return np.zeros(self._action_size)
+
+        return approx_fprime(u, lambda u: self._l(x, u, t), self._u_eps)
+
+    def l_xx(self, x, u, t, terminal=False):
+        """Second partial derivative of cost function with respect to x.
+
+        Args:
+            x: Current state [state_size].
+            u: Current control [action_size]. None if terminal.
+            t: Current time step.
+            terminal: Compute terminal cost. Default: False.
+
+        Returns:
+            d^2l/dx^2 [state_size, state_size].
+        """
+        eps = self._x_eps_hess
+        Q = np.vstack([
+            approx_fprime(x, lambda x: self.l_x(x, u, t, terminal)[i], eps)
+            for i in range(self._state_size)
+        ])
+        return Q
+
+    def l_ux(self, x, u, t, terminal=False):
+        """Second partial derivative of cost function with respect to u and x.
+
+        Args:
+            x: Current state [state_size].
+            u: Current control [action_size]. None if terminal.
+            t: Current time step.
+            terminal: Compute terminal cost. Default: False.
+
+        Returns:
+            d^2l/dudx [action_size, state_size].
+        """
+        if terminal:
+            # Not a function of u, so the derivative is zero.
+            return np.zeros((self._action_size, self._state_size))
+
+        eps = self._x_eps_hess
+        Q = np.vstack([
+            approx_fprime(x, lambda x: self.l_u(x, u, t)[i], eps)
+            for i in range(self._action_size)
+        ])
+        return Q
+
+    def l_uu(self, x, u, t, terminal=False):
+        """Second partial derivative of cost function with respect to u.
+
+        Args:
+            x: Current state [state_size].
+            u: Current control [action_size]. None if terminal.
+            t: Current time step.
+            terminal: Compute terminal cost. Default: False.
+
+        Returns:
+            d^2l/du^2 [action_size, action_size].
+        """
+        if terminal:
+            # Not a function of u, so the derivative is zero.
+            return np.zeros((self._action_size, self._action_size))
+
+        eps = self._u_eps_hess
+        Q = np.vstack([
+            approx_fprime(u, lambda u: self.l_u(x, u, t)[i], eps)
+            for i in range(self._action_size)
+        ])
+        return Q
 
 
 class QRCost(Cost):
