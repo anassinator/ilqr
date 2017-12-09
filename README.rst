@@ -90,6 +90,11 @@ Automatic differentiation
   # to avoid incurring this cost every time.
   dynamics = AutoDiffDynamics(f, x_inputs, u_inputs)
 
+*Note*: If you want to be able to use the Hessians (:code:`f_xx`, :code:`f_ux`,
+and :code:`f_uu`), you need to pass the :code:`hessians=True` argument to the
+constructor. This will increase compilation time. Note that :code:`iLQR` does
+not require second-order derivatives to function.
+
 Finite difference approximation
 """""""""""""""""""""""""""""""
 
@@ -136,14 +141,20 @@ them as follows:
   curr_u = np.array([0.0])
   t = 0  # This dynamics model is not time-varying, so this doesn't matter.
 
-  next_x = dynamics.f(curr_x, curr_u, t)
-  d_dx = dynamics.f_x(curr_x, curr_u, t)
+  >>> dynamics.f(curr_x, curr_u, t)
+  ... array([ 1.02   ,  2.01998])
+  >>> dynamics.f_x(curr_x, curr_u, t)
+  ... array([[ 1.     ,  0.01   ],
+             [ 0.     ,  1.00999]])
+  >>> dynamics.f_u(curr_x, curr_u, t)
+  ... array([[ 0.    ],
+             [ 0.0001]])
 
 Comparing the output of the :code:`AutoDiffDynamics` and the
 :code:`FiniteDiffDynamics` models should generally yield consistent results,
 but the auto-differentiated method will always be more accurate. Generally, the
 finite difference approximation will be faster unless you're also computing the
-Hessians: in which case, Theano's compiled derivatives are more optimized. 
+Hessians: in which case, Theano's compiled derivatives are more optimized.
 
 Cost function
 ^^^^^^^^^^^^^
@@ -167,8 +178,8 @@ and quadratic control errors and :math:`x_{goal}` is your target state. For
 convenience, an implementation of this cost function is made available as the
 :code:`QRCost` class.
 
-Using the :code:`QRCost` class
-""""""""""""""""""""""""""""""
+:code:`QRCost` class
+""""""""""""""""""""
 
 .. code-block:: python
 
@@ -191,7 +202,7 @@ Using the :code:`QRCost` class
   # NOTE: This is instantaneous and completely accurate.
   cost = QRCost(Q, R, Q_terminal=Q_terminal, x_goal=x_goal)
 
-Automatic Differentiation
+Automatic differentiation
 """""""""""""""""""""""""
 
 .. code-block:: python
@@ -252,8 +263,19 @@ them as follows:
 
 .. code-block:: python
 
-  instantaneous_cost = cost.l(curr_x, curr_u, t)
-  d_dx = cost.l_x(curr_x, curr_u, t)
+  >>> cost.l(curr_x, curr_u, t)
+  ... 400.0
+  >>> cost.l_x(curr_x, curr_u, t)
+  ... array([   0.,  400.])
+  >>> cost.l_u(curr_x, curr_u, t)
+  ... array([ 0.])
+  >>> cost.l_xx(curr_x, curr_u, t)
+  ... array([[ 200.,    0.],
+             [   0.,  200.]])
+  >>> cost.l_ux(curr_x, curr_u, t)
+  ... array([[ 0.,  0.]])
+  >>> cost.l_uu(curr_x, curr_u, t)
+  ... array([[ 0.02]])
 
 Putting it all together
 ^^^^^^^^^^^^^^^^^^^^^^^
