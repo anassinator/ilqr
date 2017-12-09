@@ -116,7 +116,6 @@ Finite difference approximation
         x_dot + x_dot_dot * dt,
       ])
 
-  # Compile the dynamics.
   # NOTE: Unlike with AutoDiffDynamics, this is instantaneous, but will not be
   # as accurate.
   dynamics = FiniteDiffDynamics(f, state_size, action_size)
@@ -136,11 +135,11 @@ them as follows:
   next_x = dynamics.f(curr_x, curr_u, t)
   d_dx = dynamics.f_x(curr_x, curr_u, t)
 
-Comparing the output of the :class:`AutoDiffDynamics` and the
-:class:`FiniteDiffDynamics` models should generally yield consistent results,
+Comparing the output of the :code:`AutoDiffDynamics` and the
+:code:`FiniteDiffDynamics` models should generally yield consistent results,
 but the auto-differentiated method will always be more accurate. Generally, the
 finite difference approximation will be faster unless you're also computing the
-Hessians, in which case Theano's compiled derivatives are more optimized. 
+Hessians: in which case, Theano's compiled derivatives are more optimized. 
 
 Cost function
 ^^^^^^^^^^^^^
