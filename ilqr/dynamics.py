@@ -305,12 +305,12 @@ class AutoDiffDynamics(Dynamics):
         return self._f_uu(*z)
 
 
-class FiniteDifferenceDynamics(Dynamics):
+class FiniteDiffDynamics(Dynamics):
 
     """Finite-Difference Dynamics Model."""
 
     def __init__(self, f, state_size, action_size, x_eps=None, u_eps=None):
-        """Constructs an FiniteDifferenceDynamics model.
+        """Constructs an FiniteDiffDynamics model.
 
         Args:
             f: Function to approximate. Signature (x, u, t) -> x.
@@ -332,7 +332,7 @@ class FiniteDifferenceDynamics(Dynamics):
         self._x_eps = x_eps if x_eps else np.sqrt(np.finfo(float).eps)
         self._u_eps = u_eps if x_eps else np.sqrt(np.finfo(float).eps)
 
-        super(FiniteDifferenceDynamics, self).__init__()
+        super(FiniteDiffDynamics, self).__init__()
 
     @property
     def state_size(self):
