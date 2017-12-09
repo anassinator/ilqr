@@ -67,7 +67,7 @@ Automatic differentiation
   x_dot = T.dscalar("x_dot")  # Velocity.
   F = T.dscalar("F")  # Force.
 
-  dt = 0.01  # Discrete time step in seconds.
+  dt = 0.01  # Discrete time-step in seconds.
   m = 1.0  # Mass in kg.
   alpha = 0.1  # Friction coefficient.
 
@@ -100,7 +100,7 @@ Finite difference approximation
   state_size = 2  # [position, velocity]
   action_size = 1  # [force]
 
-  dt = 0.01  # Discrete time step in seconds.
+  dt = 0.01  # Discrete time-step in seconds.
   m = 1.0  # Mass in kg.
   alpha = 0.1  # Friction coefficient.
 
@@ -119,6 +119,10 @@ Finite difference approximation
   # NOTE: Unlike with AutoDiffDynamics, this is instantaneous, but will not be
   # as accurate.
   dynamics = FiniteDiffDynamics(f, state_size, action_size)
+
+*Note*: It is possible you might need to play with the epsilon values
+(:code:`x_eps` and :code:`u_eps`) used when computing the approximation if you
+run into numerical instability issues.
 
 Usage
 """""
@@ -159,9 +163,12 @@ Regulators:
   (x - x_{goal})^T Q (x - x_{goal}) + (u - u_{goal})^T R (u - u_{goal})
 
 where :math:`Q` and :math:`R` are matrices defining your quadratic state error
-and quadratic control errors and :math:`x_{goal}` is your target state. An
-implementation of this cost function is made available as the `QRCost` class
-and can be used as follows:
+and quadratic control errors and :math:`x_{goal}` is your target state. For
+convenience, an implementation of this cost function is made available as the
+:code:`QRCost` class.
+
+Using the :code:`QRCost` class
+""""""""""""""""""""""""""""""
 
 .. code-block:: python
 
@@ -171,8 +178,8 @@ and can be used as follows:
   # The coefficients weigh how much your state error is worth to you vs
   # the size of your controls. You can favor a solution that uses smaller
   # controls by increasing R's coefficient.
-  Q = 100 * np.eye(dynamics.state_size)
-  R = 0.01 * np.eye(dynamics.action_size)
+  Q = 100 * np.eye(state_size)
+  R = 0.01 * np.eye(action_size)
 
   # This is optional if you want your cost to be computed differently at a
   # terminal state.
@@ -181,9 +188,67 @@ and can be used as follows:
   # State goal is set to a position of 1 m with no velocity.
   x_goal = np.array([1.0, 0.0])
 
+  # NOTE: This is instantaneous and completely accurate.
   cost = QRCost(Q, R, Q_terminal=Q_terminal, x_goal=x_goal)
 
-You can then use this as follows:
+Automatic Differentiation
+"""""""""""""""""""""""""
+
+.. code-block:: python
+
+  import theano.tensor as T
+  from ilqr.cost import AutoDiffCost
+
+  x_inputs = [T.dscalar("x"), T.dscalar("x_dot")]
+  u_inputs = [T.dscalar("F")]
+
+  x = T.stack(x_inputs)
+  u = T.stack(u_inputs)
+
+  x_diff = x - x_goal
+  l = x_diff.T.dot(Q).dot(x_diff) + u.T.dot(R).dot(u)
+  l_terminal = x_diff.T.dot(Q_terminal).dot(x_diff)
+
+  # Compile the cost.
+  # NOTE: This can be slow as it's computing and compiling the derivatives.
+  # But that's okay since it's only a one-time cost on startup. You could save
+  # a serialized version of this object to reuse on the next startup in order
+  # to avoid incurring this cost every time.
+  cost = AutoDiffCost(l, l_terminal, x_inputs, u_inputs)
+
+Finite difference approximation
+"""""""""""""""""""""""""""""""
+
+.. code-block:: python
+
+  from ilqr.cost import FiniteDiffCost
+
+
+  def l(x, u, t):
+      """Instantaneous cost function."""
+      x_diff = x - x_goal
+      return x_diff.T.dot(Q).dot(x_diff) + u.T.dot(R).dot(u)
+
+
+  def l_terminal(x, t):
+      """Terminal cost function."""
+      x_diff = x - x_goal
+      return x_diff.T.dot(Q_terminal).dot(x_diff)
+
+
+  # NOTE: Unlike with AutoDiffCost, this is instantaneous, but will not be as
+  # accurate.
+  cost = FiniteDiffCost(l, l_terminal, state_size, action_size)
+
+*Note*: It is possible you might need to play with the epsilon values
+(:code:`x_eps` and :code:`u_eps`) used when computing the approximation if you
+run into numerical instability issues.
+
+Usage
+"""""
+
+Regardless of the method used for constructing your cost function, you can use
+them as follows:
 
 .. code-block:: python
 
@@ -195,11 +260,11 @@ Putting it all together
 
 .. code-block:: python
 
-  T = 1000  # Number of time steps in trajectory.
+  N = 1000  # Number of time-steps in trajectory.
   x0 = np.array([0.0, -0.1])  # Initial state.
-  us_init = np.random.uniform(-1, 1, (T, 1)) # Random initial action path.
+  us_init = np.random.uniform(-1, 1, (N, 1)) # Random initial action path.
 
-  ilqr = iLQR(dynamics, cost, T)
+  ilqr = iLQR(dynamics, cost, N)
   xs, us = ilqr.fit(x0, us_init)
 
 :code:`xs` and :code:`us` now hold the optimal state and control trajectory
@@ -213,11 +278,11 @@ Important notes
 
 To quote from Tassa's paper: "Two important parameters which have a direct
 impact on performance are the simulation time-step :code:`dt` and the horizon
-length :code:`T`. Since speed is of the essence, the goal is to choose those
+length :code:`N`. Since speed is of the essence, the goal is to choose those
 values which minimize the number of steps in the trajectory, i.e. the largest
 possible time-step and the shortest possible horizon. The size of :code:`dt`
 is limited by our use of Euler integration; beyond some value the simulation
-becomes unstable. The minimum length of the horizon :code:`T` is a
+becomes unstable. The minimum length of the horizon :code:`N` is a
 problem-dependent quantity which must be found by trial-and-error."
 
 Contributing
