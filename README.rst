@@ -37,21 +37,26 @@ can be solved through iLQR.
 Dynamics model
 ^^^^^^^^^^^^^^
 
-You can set up your own dynamics model by either extending the
-:code:`DynamicsModel` class and hard-coding it and its partial derivatives.
-Alternatively, you can write it up as a `Theano` expression and use the
-:code:`AutoDiffDynamicsModel` class for it to be auto-differentiated.
+You can set up your own dynamics model by either extending the :code:`Dynamics`
+class and hard-coding it and its partial derivatives. Alternatively, you can
+write it up as a `Theano` expression and use the :code:`AutoDiffDynamics` class
+for it to be auto-differentiated. Finally, if all you have is a function, you
+can use the :code:`FiniteDiffDynamics` class to approximate the derivatives
+with finite difference approximation.
 
-This is an example of the following dynamics model:
+This section demonstrates how to implement the following dynamics model:
 
 .. math::
 
-  m \dot{v} = u - \alpha v
+  m \dot{v} = F - \alpha v
 
 where :math:`m` is the object's mass in :math:`kg`, :math:`alpha` is the
 friction coefficient, :math:`v` is the object's velocity in :math:`m/s`,
-:math:`\dot{v}` is the object's acceleration in :math:`m/s^2`, and :math:`u` is
+:math:`\dot{v}` is the object's acceleration in :math:`m/s^2`, and :math:`F` is
 the control (or force) you're applying to the object in :math:`N`.
+
+Automatic differentiation
+"""""""""""""""""""""""""
 
 .. code-block:: python
 
@@ -60,14 +65,14 @@ the control (or force) you're applying to the object in :math:`N`.
 
   x = T.dscalar("x")  # Position.
   x_dot = T.dscalar("x_dot")  # Velocity.
-  u = T.dscalar("u")  # Force.
+  F = T.dscalar("F")  # Force.
 
   dt = 0.01  # Discrete time step in seconds.
   m = 1.0  # Mass in kg.
   alpha = 0.1  # Friction coefficient.
 
   # Acceleration.
-  x_dot_dot = x_dot * (1 - alpha * dt / m) + u * dt / m
+  x_dot_dot = x_dot * (1 - alpha * dt / m) + F * dt / m
 
   # Discrete dynamics model definition.
   f = T.stack([
@@ -76,25 +81,66 @@ the control (or force) you're applying to the object in :math:`N`.
   ])
 
   x_inputs = [x, x_dot]  # State vector.
-  u_inputs = [u]  # Control vector.
+  u_inputs = [F]  # Control vector.
 
   # Compile the dynamics.
-  # NOTE: This can be slow as it's computing the symbolic derivatives.
+  # NOTE: This can be slow as it's computing and compiling the derivatives.
   # But that's okay since it's only a one-time cost on startup. You could save
   # a serialized version of this object to reuse on the next startup in order
-  # to avoid incurring this cost everytime.
+  # to avoid incurring this cost every time.
   dynamics = AutoDiffDynamics(f, x_inputs, u_inputs)
 
-You can then use this as follows:
+Finite difference approximation
+"""""""""""""""""""""""""""""""
 
 .. code-block:: python
 
-  # NOTE: This computes very quickly since the functions were compiled.
+  from ilqr.dynamics import FiniteDiffDynamics
+
+  state_size = 2  # [position, velocity]
+  action_size = 1  # [force]
+
+  dt = 0.01  # Discrete time step in seconds.
+  m = 1.0  # Mass in kg.
+  alpha = 0.1  # Friction coefficient.
+
+  def f(x, u, t):
+      [x, x_dot] = x
+      [F] = u
+
+      # Acceleration.
+      x_dot_dot = x_dot * (1 - alpha * dt / m) + F * dt / m
+
+      return np.array([
+        x + x_dot * dt,
+        x_dot + x_dot_dot * dt,
+      ])
+
+  # Compile the dynamics.
+  # NOTE: Unlike with AutoDiffDynamics, this is instantaneous, but will not be
+  # as accurate.
+  dynamics = FiniteDiffDynamics(f, state_size, action_size)
+
+Usage
+"""""
+
+Regardless of the method used for constructing your dynamics model, you can use
+them as follows:
+
+.. code-block:: python
+
   curr_x = np.array([1.0, 2.0])
   curr_u = np.array([0.0])
   t = 0  # This dynamics model is not time-varying, so this doesn't matter.
+
   next_x = dynamics.f(curr_x, curr_u, t)
   d_dx = dynamics.f_x(curr_x, curr_u, t)
+
+Comparing the output of the :class:`AutoDiffDynamics` and the
+:class:`FiniteDiffDynamics` models should generally yield consistent results,
+but the auto-differentiated method will always be more accurate. Generally, the
+finite difference approximation will be faster unless you're also computing the
+Hessians, in which case Theano's compiled derivatives are more optimized. 
 
 Cost function
 ^^^^^^^^^^^^^
@@ -130,7 +176,7 @@ and can be used as follows:
   # terminal state.
   Q_terminal = np.array([[100.0, 0.0], [0.0, 0.1]])
 
-  # State goal is set to a position of 1m with no velocity.
+  # State goal is set to a position of 1 m with no velocity.
   x_goal = np.array([1.0, 0.0])
 
   cost = QRCost(Q, R, Q_terminal=Q_terminal, x_goal=x_goal)
