@@ -307,13 +307,13 @@ class AutoDiffDynamics(Dynamics):
 
 class FiniteDiffDynamics(Dynamics):
 
-    """Finite-Difference Dynamics Model."""
+    """Finite difference approximated Dynamics Model."""
 
     def __init__(self, f, state_size, action_size, x_eps=None, u_eps=None):
         """Constructs an FiniteDiffDynamics model.
 
         Args:
-            f: Function to approximate. Signature (x, u, t) -> x.
+            f: Function to approximate. Signature: (x, u, t) -> x.
             state_size: State size.
             action_size: Action size.
             x_eps: Increment to the state to use when estimating the gradient.
@@ -331,6 +331,9 @@ class FiniteDiffDynamics(Dynamics):
 
         self._x_eps = x_eps if x_eps else np.sqrt(np.finfo(float).eps)
         self._u_eps = u_eps if x_eps else np.sqrt(np.finfo(float).eps)
+
+        self._x_eps_hess = np.sqrt(self._x_eps)
+        self._u_eps_hess = np.sqrt(self._u_eps)
 
         super(FiniteDiffDynamics, self).__init__()
 
@@ -407,11 +410,12 @@ class FiniteDiffDynamics(Dynamics):
         Returns:
             d^2f/dx^2 [state_size, state_size, state_size].
         """
+        eps = self._x_eps_hess
+
         # yapf: disable
         Q = np.array([
             [
-                approx_fprime(x, lambda x: self.f_x(x, u, t)[i, j],
-                              np.sqrt(self._x_eps))
+                approx_fprime(x, lambda x: self.f_x(x, u, t)[i, j], eps)
                 for j in range(self._state_size)
             ]
             for i in range(self._state_size)
@@ -430,11 +434,12 @@ class FiniteDiffDynamics(Dynamics):
         Returns:
             d^2f/dudx [state_size, action_size, state_size].
         """
+        eps = self._x_eps_hess
+
         # yapf: disable
         Q = np.array([
             [
-                approx_fprime(x, lambda x: self.f_u(x, u, t)[i, j],
-                              np.sqrt(self._x_eps))
+                approx_fprime(x, lambda x: self.f_u(x, u, t)[i, j], eps)
                 for j in range(self._action_size)
             ]
             for i in range(self._state_size)
@@ -453,11 +458,12 @@ class FiniteDiffDynamics(Dynamics):
         Returns:
             d^2f/du^2 [state_size, action_size, action_size].
         """
+        eps = self._u_eps_hess
+
         # yapf: disable
         Q = np.array([
             [
-                approx_fprime(u, lambda u: self.f_u(x, u, t)[i, j],
-                              np.sqrt(self._u_eps))
+                approx_fprime(u, lambda u: self.f_u(x, u, t)[i, j], eps)
                 for j in range(self._action_size)
             ]
             for i in range(self._state_size)
