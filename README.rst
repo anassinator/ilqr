@@ -109,7 +109,17 @@ Finite difference approximation
   m = 1.0  # Mass in kg.
   alpha = 0.1  # Friction coefficient.
 
-  def f(x, u, t):
+  def f(x, u, i):
+      """Dynamics model function.
+
+      Args:
+          x: State vector [state_size].
+          u: Control vector [action_size].
+          i: Current time step.
+
+      Returns:
+          Next state vector [state_size].
+      """
       [x, x_dot] = x
       [F] = u
 
@@ -139,14 +149,14 @@ them as follows:
 
   curr_x = np.array([1.0, 2.0])
   curr_u = np.array([0.0])
-  t = 0  # This dynamics model is not time-varying, so this doesn't matter.
+  i = 0  # This dynamics model is not time-varying, so this doesn't matter.
 
-  >>> dynamics.f(curr_x, curr_u, t)
+  >>> dynamics.f(curr_x, curr_u, i)
   ... array([ 1.02   ,  2.01998])
-  >>> dynamics.f_x(curr_x, curr_u, t)
+  >>> dynamics.f_x(curr_x, curr_u, i)
   ... array([[ 1.     ,  0.01   ],
              [ 0.     ,  1.00999]])
-  >>> dynamics.f_u(curr_x, curr_u, t)
+  >>> dynamics.f_u(curr_x, curr_u, i)
   ... array([[ 0.    ],
              [ 0.0001]])
 
@@ -235,14 +245,31 @@ Finite difference approximation
   from ilqr.cost import FiniteDiffCost
 
 
-  def l(x, u, t):
-      """Instantaneous cost function."""
+  def l(x, u, i):
+      """Instantaneous cost function.
+
+      Args:
+          x: State vector [state_size].
+          u: Control vector [action_size].
+          i: Current time step.
+
+      Returns:
+          Instantaneous cost [scalar].
+      """
       x_diff = x - x_goal
       return x_diff.T.dot(Q).dot(x_diff) + u.T.dot(R).dot(u)
 
 
-  def l_terminal(x, t):
-      """Terminal cost function."""
+  def l_terminal(x, i):
+      """Terminal cost function.
+
+      Args:
+          x: State vector [state_size].
+          i: Current time step.
+
+      Returns:
+          Terminal cost [scalar].
+      """
       x_diff = x - x_goal
       return x_diff.T.dot(Q_terminal).dot(x_diff)
 
@@ -263,18 +290,18 @@ them as follows:
 
 .. code-block:: python
 
-  >>> cost.l(curr_x, curr_u, t)
+  >>> cost.l(curr_x, curr_u, i)
   ... 400.0
-  >>> cost.l_x(curr_x, curr_u, t)
+  >>> cost.l_x(curr_x, curr_u, i)
   ... array([   0.,  400.])
-  >>> cost.l_u(curr_x, curr_u, t)
+  >>> cost.l_u(curr_x, curr_u, i)
   ... array([ 0.])
-  >>> cost.l_xx(curr_x, curr_u, t)
+  >>> cost.l_xx(curr_x, curr_u, i)
   ... array([[ 200.,    0.],
              [   0.,  200.]])
-  >>> cost.l_ux(curr_x, curr_u, t)
+  >>> cost.l_ux(curr_x, curr_u, i)
   ... array([[ 0.,  0.]])
-  >>> cost.l_uu(curr_x, curr_u, t)
+  >>> cost.l_uu(curr_x, curr_u, i)
   ... array([[ 0.02]])
 
 Putting it all together
