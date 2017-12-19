@@ -18,13 +18,13 @@ class BaseController():
 
         Args:
             x0: Initial state [state_size].
-            us_init: Initial control path [T, action_size].
+            us_init: Initial control path [N, action_size].
             *args, **kwargs: Additional positional and key-word arguments.
 
         Returns:
             Tuple of
-                xs: optimal state path [T+1, state_size].
-                us: optimal control path [T, action_size].
+                xs: optimal state path [N+1, state_size].
+                us: optimal control path [N, action_size].
         """
         raise NotImplementedError
 
@@ -33,13 +33,13 @@ class iLQR(BaseController):
 
     """Finite Horizon Iterative Linear Quadratic Regulator."""
 
-    def __init__(self, dynamics, cost, T, max_reg=1e10, hessians=False):
+    def __init__(self, dynamics, cost, N, max_reg=1e10, hessians=False):
         """Constructs an iLQR solver.
 
         Args:
             dynamics: Plant dynamics.
             cost: Cost function.
-            T: Horizon length.
+            N: Horizon length.
             max_reg: Maximum regularization term to break early due to
                 divergence. This can be disabled by setting it to None.
             hessians: Use the dynamic model's second order derivatives.
@@ -48,7 +48,7 @@ class iLQR(BaseController):
         """
         self.dynamics = dynamics
         self.cost = cost
-        self.T = T
+        self.N = N
         self._use_hessians = hessians and dynamics.has_hessians
         if hessians and not dynamics.has_hessians:
             warnings.warn("hessians requested but are unavailable in dynamics")
@@ -68,7 +68,7 @@ class iLQR(BaseController):
 
         Args:
             x0: Initial state [state_size].
-            us_init: Initial control path [T, action_size].
+            us_init: Initial control path [N, action_size].
             n_iterations: Maximum number of interations. Default: 100.
             tol: Tolerance. Default: 1e-6.
             on_iteration: Callback at the end of each iteration with the
@@ -85,8 +85,8 @@ class iLQR(BaseController):
 
         Returns:
             Tuple of
-                xs: optimal state path [T+1, state_size].
-                us: optimal control path [T, action_size].
+                xs: optimal state path [N+1, state_size].
+                us: optimal control path [N, action_size].
         """
         # Reset regularization term.
         self._mu = 1.0
@@ -100,7 +100,7 @@ class iLQR(BaseController):
         J_opt = self._trajectory_cost(xs, us)
 
         converged = False
-        for i in range(n_iterations):
+        for iteration in range(n_iterations):
             accepted = False
 
             try:
@@ -142,7 +142,7 @@ class iLQR(BaseController):
                     break
 
             if on_iteration:
-                on_iteration(i, xs, us, J_opt, accepted, converged)
+                on_iteration(iteration, xs, us, J_opt, accepted, converged)
 
             if converged:
                 break
@@ -159,29 +159,29 @@ class iLQR(BaseController):
         """Applies the controls for a given trajectory.
 
         Args:
-            xs: Nominal state path [T+1, state_size].
-            us: Nominal control path [T, action_size].
-            k: Feedforward gains [T, action_size].
-            K: Feedback gains [T, action_size, state_size].
+            xs: Nominal state path [N+1, state_size].
+            us: Nominal control path [N, action_size].
+            k: Feedforward gains [N, action_size].
+            K: Feedback gains [N, action_size, state_size].
             alpha: Line search coefficient.
 
         Returns:
             Tuple of
-                xs: state path [T+1, state_size].
-                us: control path [T, action_size].
+                xs: state path [N+1, state_size].
+                us: control path [N, action_size].
         """
         xs_new = np.zeros_like(xs)
         us_new = np.zeros_like(us)
         xs_new[0] = xs[0].copy()
 
-        for t in range(self.T):
+        for i in range(self.N):
             # Eq (12).
-            # Applying alpha only on k[t] as in the paper for some reason
+            # Applying alpha only on k[i] as in the paper for some reason
             # doesn't converge.
-            us_new[t] = us[t] + alpha * (k[t] + K[t].dot(xs_new[t] - xs[t]))
+            us_new[i] = us[i] + alpha * (k[i] + K[i].dot(xs_new[i] - xs[i]))
 
             # Eq (8c).
-            xs_new[t + 1] = self.dynamics.f(xs_new[t], us_new[t], t)
+            xs_new[i + 1] = self.dynamics.f(xs_new[i], us_new[i], i)
 
         return xs_new, us_new
 
@@ -189,15 +189,15 @@ class iLQR(BaseController):
         """Computes the given trajectory's cost.
 
         Args:
-            xs: State path [T+1, state_size].
-            us: Control path [T, action_size].
+            xs: State path [N+1, state_size].
+            us: Control path [N, action_size].
 
         Returns:
             Trajectory's total cost.
         """
         J = map(lambda args: self.cost.l(*args), zip(xs[:-1], us,
-                                                     range(self.T)))
-        return sum(J) + self.cost.l(xs[-1], None, self.T, terminal=True)
+                                                     range(self.N)))
+        return sum(J) + self.cost.l(xs[-1], None, self.N, terminal=True)
 
     def _forward_rollout(self, x0, us):
         """Apply the forward dynamics to have a trajectory from the starting
@@ -205,14 +205,14 @@ class iLQR(BaseController):
 
         Args:
             x0: Initial state [state_size].
-            us: Control path [T, action_size].
+            us: Control path [N, action_size].
 
         Returns:
-            State path [T+1, state_size].
+            State path [N+1, state_size].
         """
         xs = np.array([x0])
-        for t in range(self.T):
-            x_new = self.dynamics.f(xs[-1], us[t], t)
+        for i in range(self.N):
+            x_new = self.dynamics.f(xs[-1], us[i], i)
             xs = np.append(xs, [x_new], axis=0)
 
         return xs
@@ -221,43 +221,43 @@ class iLQR(BaseController):
         """Computes the feedforward and feedback gains k and K.
 
         Args:
-            xs: State path [T+1, state_size].
-            us: Control path [T, action_size].
+            xs: State path [N+1, state_size].
+            us: Control path [N, action_size].
 
         Returns:
             Tuple of
-                k: feedforward gains [T, action_size].
-                K: feedback gains [T, action_size, state_size].
+                k: feedforward gains [N, action_size].
+                K: feedback gains [N, action_size, state_size].
         """
-        V_x = self.cost.l_x(xs[-1], None, self.T, terminal=True)
-        V_xx = self.cost.l_xx(xs[-1], None, self.T, terminal=True)
+        V_x = self.cost.l_x(xs[-1], None, self.N, terminal=True)
+        V_xx = self.cost.l_xx(xs[-1], None, self.N, terminal=True)
 
-        k = [None] * self.T
-        K = [None] * self.T
+        k = [None] * self.N
+        K = [None] * self.N
 
-        for t in range(self.T - 1, -1, -1):
-            x = xs[t]
-            u = us[t]
+        for i in range(self.N - 1, -1, -1):
+            x = xs[i]
+            u = us[i]
 
-            Q_x, Q_u, Q_xx, Q_ux, Q_uu = self._Q(x, u, V_x, V_xx, t)
+            Q_x, Q_u, Q_xx, Q_ux, Q_uu = self._Q(x, u, V_x, V_xx, i)
             Q_uu_inv = np.linalg.pinv(Q_uu)
 
             # Eq (6).
-            k[t] = -Q_uu_inv.dot(Q_u)
-            K[t] = -Q_uu_inv.dot(Q_ux)
+            k[i] = -Q_uu_inv.dot(Q_u)
+            K[i] = -Q_uu_inv.dot(Q_ux)
 
             # Eq (11b).
-            V_x = Q_x + K[t].T.dot(Q_uu).dot(k[t])
-            V_x += K[t].T.dot(Q_u) + Q_ux.T.dot(k[t])
+            V_x = Q_x + K[i].T.dot(Q_uu).dot(k[i])
+            V_x += K[i].T.dot(Q_u) + Q_ux.T.dot(k[i])
 
             # Eq (11c).
-            V_xx = Q_xx + K[t].T.dot(Q_uu).dot(K[t])
-            V_xx += K[t].T.dot(Q_ux) + Q_ux.T.dot(K[t])
+            V_xx = Q_xx + K[i].T.dot(Q_uu).dot(K[i])
+            V_xx += K[i].T.dot(Q_ux) + Q_ux.T.dot(K[i])
             V_xx = 0.5 * (V_xx + V_xx.T)  # To maintain symmetry.
 
         return np.array(k), np.array(K)
 
-    def _Q(self, x, u, V_x, V_xx, t):
+    def _Q(self, x, u, V_x, V_xx, i):
         """Computes second order expansion.
 
         Args:
@@ -266,7 +266,7 @@ class iLQR(BaseController):
             V_x: d/dx of the value function at the next time step [state_size].
             V_xx: d^2/dx^2 of the value function at the next time step
                 [state_size, state_size].
-            t: Current time step.
+            i: Current time step.
 
         Returns:
             Tuple of
@@ -276,14 +276,14 @@ class iLQR(BaseController):
                 Q_ux: [action_size, state_size].
                 Q_uu: [action_size, action_size].
         """
-        f_x = self.dynamics.f_x(x, u, t)
-        f_u = self.dynamics.f_u(x, u, t)
+        f_x = self.dynamics.f_x(x, u, i)
+        f_u = self.dynamics.f_u(x, u, i)
 
-        l_x = self.cost.l_x(x, u, t)
-        l_u = self.cost.l_u(x, u, t)
-        l_xx = self.cost.l_xx(x, u, t)
-        l_ux = self.cost.l_ux(x, u, t)
-        l_uu = self.cost.l_uu(x, u, t)
+        l_x = self.cost.l_x(x, u, i)
+        l_u = self.cost.l_u(x, u, i)
+        l_xx = self.cost.l_xx(x, u, i)
+        l_ux = self.cost.l_ux(x, u, i)
+        l_uu = self.cost.l_uu(x, u, i)
 
         # Eqs (5a), (5b) and (5c).
         Q_x = l_x + f_x.T.dot(V_x)
@@ -296,9 +296,9 @@ class iLQR(BaseController):
         Q_uu = l_uu + f_u.T.dot(V_xx + reg).dot(f_u)
 
         if self._use_hessians:
-            f_xx = self.dynamics.f_xx(x, u, t)
-            f_ux = self.dynamics.f_ux(x, u, t)
-            f_uu = self.dynamics.f_uu(x, u, t)
+            f_xx = self.dynamics.f_xx(x, u, i)
+            f_ux = self.dynamics.f_ux(x, u, i)
+            f_uu = self.dynamics.f_uu(x, u, i)
 
             Q_xx += np.tensordot(V_x, f_xx, axes=1)
             Q_ux += np.tensordot(V_x, f_ux, axes=1)
@@ -351,7 +351,7 @@ class RecedingHorizonController(object):
         to shift their internal state accordingly.
 
         Args:
-            us_init: Initial control path [T, action_size].
+            us_init: Initial control path [N, action_size].
             step_size: Number of steps between each controller fit. Default: 1.
                 i.e. re-fit at every time step. You might need to increase this
                 depending on how powerful your machine is in order to run this
