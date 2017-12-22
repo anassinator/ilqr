@@ -61,6 +61,9 @@ class iLQR(BaseController):
         self._delta_0 = 2.0
         self._delta = self._delta_0
 
+        self._k = np.zeros((N, dynamics.action_size))
+        self._K = np.zeros((N, dynamics.action_size, dynamics.state_size))
+
         super(iLQR, self).__init__()
 
     def fit(self, x0, us_init, n_iterations=100, tol=1e-6, on_iteration=None):
@@ -96,6 +99,8 @@ class iLQR(BaseController):
 
         us = us_init.copy()
         xs = self._forward_rollout(x0, us)
+        k = self._k
+        K = self._K
 
         J_opt = self._trajectory_cost(xs, us)
 
@@ -232,8 +237,8 @@ class iLQR(BaseController):
         V_x = self.cost.l_x(xs[-1], None, self.N, terminal=True)
         V_xx = self.cost.l_xx(xs[-1], None, self.N, terminal=True)
 
-        k = [None] * self.N
-        K = [None] * self.N
+        k = np.zeros_like(self._k)
+        K = np.zeros_like(self._K)
 
         for i in range(self.N - 1, -1, -1):
             x = xs[i]
