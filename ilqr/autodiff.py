@@ -19,21 +19,18 @@ def jacobian_scalar(expr, wrt):
     return J
 
 
-def jacobian_vector(expr, wrt):
+def jacobian_vector(expr, wrt, size):
     """Computes the Jacobian of a vector expression with respect to varaibles.
 
     Args:
         expr: Vector Theano tensor expression.
         wrt: List of Theano variables.
+        size: Vector size.
 
     Returns:
         Theano tensor.
     """
-    try:
-        return _tensor_map(lambda f: jacobian_scalar(f, wrt), expr)
-    except ValueError:
-        # Fallback for wider support.
-        return T.stack([T.jacobian(expr, wrt, disconnected_inputs="ignore")])
+    return _tensor_map(lambda f: jacobian_scalar(f, wrt), expr, size)
 
 
 def hessian_scalar(expr, wrt):
@@ -51,35 +48,33 @@ def hessian_scalar(expr, wrt):
     return Q
 
 
-def hessian_vector(expr, wrt):
+def hessian_vector(expr, wrt, size):
     """Computes the Hessian of a vector expression with respect to varaibles.
 
     Args:
         expr: Vector Theano tensor expression.
         wrt: List of Theano variables.
+        size: Vector size.
 
     Returns:
         Theano tensor.
     """
-    try:
-        return _tensor_map(lambda f: hessian_scalar(f, wrt), expr)
-    except ValueError:
-        # Fallback for wider support.
-        return T.stack([T.hessian(expr, wrt, disconnected_inputs="ignore")])
+    return _tensor_map(lambda x: hessian_scalar(x, wrt), expr, size)
 
 
-def _tensor_map(f, expr):
+def _tensor_map(f, expr, size):
     """Maps a function onto of a vector expression.
 
     Args:
         f: Function to apply.
         expr: Theano tensor expression.
         wrt: List of Theano variables.
+        size: Vector size.
 
     Returns:
         Theano tensor.
     """
-    return T.stack([f(y) for y in expr])
+    return T.stack([f(expr[i]) for i in range(size)])
 
 
 def as_function(expr, inputs, **kwargs):

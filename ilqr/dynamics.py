@@ -148,19 +148,22 @@ class AutoDiffDynamics(Dynamics):
             **kwargs: Additional keyword-arguments to pass to
                 `theano.function()`.
         """
+        self._tensor = f
         self._i = T.dscalar("i") if i is None else i
-        self._x_inputs = x_inputs
-        self._u_inputs = u_inputs
 
         non_t_inputs = np.hstack([x_inputs, u_inputs]).tolist()
         inputs = np.hstack([x_inputs, u_inputs, self._i]).tolist()
+        self._x_inputs = x_inputs
+        self._u_inputs = u_inputs
+        self._inputs = inputs
+        self._non_t_inputs = non_t_inputs
 
         x_dim = len(x_inputs)
         u_dim = len(u_inputs)
         self._state_size = x_dim
         self._action_size = u_dim
 
-        self._J = jacobian_vector(f, non_t_inputs)
+        self._J = jacobian_vector(f, non_t_inputs, x_dim)
 
         self._f = as_function(f, inputs, name="f", **kwargs)
 
@@ -171,7 +174,7 @@ class AutoDiffDynamics(Dynamics):
 
         self._has_hessians = hessians
         if hessians:
-            self._Q = hessian_vector(f, non_t_inputs)
+            self._Q = hessian_vector(f, non_t_inputs, x_dim)
             self._f_xx = as_function(
                 self._Q[:, :x_dim, :x_dim], inputs, name="f_xx", **kwargs)
             self._f_ux = as_function(
@@ -195,6 +198,11 @@ class AutoDiffDynamics(Dynamics):
     def has_hessians(self):
         """Whether the second order derivatives are available."""
         return self._has_hessians
+
+    @property
+    def tensor(self):
+        """The dynamics model variable."""
+        return self._tensor
 
     @property
     def x(self):
