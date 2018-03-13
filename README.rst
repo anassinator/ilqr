@@ -21,6 +21,12 @@ To install, clone and run:
 
   python setup.py install
 
+You may also install the dependencies with `pipenv` as follows:
+
+.. code-block:: bash
+
+  pipenv install
+
 Usage
 -----
 
@@ -32,7 +38,7 @@ After installing, :code:`import` as follows:
 
 You can see the `examples <examples/>`_ directory for
 `Jupyter <https://jupyter.org>`_ notebooks to see how common control problems
-can be solved through iLQR. 
+can be solved through iLQR.
 
 Dynamics model
 ^^^^^^^^^^^^^^

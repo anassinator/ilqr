@@ -4,8 +4,8 @@ python:
   - "3.5"
   - "3.6"
 install:
-  - pip install yapf
-  - pip install -r requirements.txt
-  - python setup.py install
+  - pip install pipenv yapf
+  - pipenv install
+  - pipenv run python setup.py install
 script:
   - yapf --diff --recursive .
