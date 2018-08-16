@@ -92,6 +92,7 @@ class iLQR(BaseController):
         """
         # Reset regularization term.
         self._mu = 1.0
+        self._delta = self._delta_0
 
         # Backtracking line search candidates 0 < alpha <= 1.
         alphas = 1.1**(-np.arange(10)**2)
@@ -100,15 +101,20 @@ class iLQR(BaseController):
         k = self._k
         K = self._K
 
+        changed = True
         converged = False
         for iteration in range(n_iterations):
             accepted = False
 
-            xs, F_x, F_u, L, L_x, L_u, L_xx, L_ux, L_uu = self._forward_rollout(
-                x0, us)
-            J_opt = L.sum()
+            # Forward rollout only if it needs to be recomputed.
+            if changed:
+                rollout = self._forward_rollout(x0, us)
+                xs, F_x, F_u, L, L_x, L_u, L_xx, L_ux, L_uu = rollout
+                J_opt = L.sum()
+                changed = False
 
             try:
+                # Backward pass.
                 k, K = self._backward_pass(F_x, F_u, L_x, L_u, L_xx, L_ux, L_uu)
 
                 # Backtracking line search.
@@ -123,6 +129,7 @@ class iLQR(BaseController):
                         J_opt = J_new
                         xs = xs_new
                         us = us_new
+                        changed = True
 
                         # Decrease regularization term.
                         self._delta = min(1.0, self._delta) / self._delta_0
@@ -245,7 +252,7 @@ class iLQR(BaseController):
         L_uu = np.empty((N, action_size, action_size))
 
         xs[0] = x0
-        for i in range(self.N):
+        for i in range(N):
             x = xs[i]
             u = us[i]
 
