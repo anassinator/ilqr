@@ -439,6 +439,12 @@ needs. You can auto-format your changes with the following command:
 
   yapf --recursive --in-place --parallel .
 
+You may install the linter as follows:
+
+.. code-block:: bash
+
+  pipenv install --dev
+
 License
 -------
 

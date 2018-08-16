@@ -46,7 +46,7 @@ setup(
     zip_safe=True,
     install_requires=INSTALL_REQUIRES,
     classifiers=[
-        "Development Status :: 2 - Pre-Alpha",
+        "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",
         "Intended Audience :: Science/Research",
         "License :: OSI Approved :: MIT License",
