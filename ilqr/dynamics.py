@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Dynamics model."""
 
 import six
@@ -7,7 +6,8 @@ import theano
 import numpy as np
 import theano.tensor as T
 from scipy.optimize import approx_fprime
-from .autodiff import as_function, hessian_vector, jacobian_vector
+from .autodiff import (as_function, batch_jacobian, hessian_vector,
+                       jacobian_vector)
 
 
 @six.add_metaclass(abc.ABCMeta)
@@ -311,6 +311,168 @@ class AutoDiffDynamics(Dynamics):
 
         z = np.hstack([x, u, i])
         return self._f_uu(*z)
+
+
+class BatchAutoDiffDynamics(Dynamics):
+
+    """Batch Auto-differentiated Dynamics Model.
+
+    NOTE: This offers faster derivatives than AutoDiffDynamics if you can
+          describe your dynamics model as a symbolic function that can take
+          batches of inputs.
+
+    NOTE: This does not currently support computing hessians.
+    """
+
+    def __init__(self, f, state_size, action_size, **kwargs):
+        """Constructs a BatchAutoDiffDynamics model.
+
+        Args:
+            f: Symbolic function with the following signature:
+                Args:
+                    x: Batch of state variables.
+                    u: Batch of action variables.
+                    i: Batch of time step variables.
+                Returns:
+                    f: Batch of next state variables.
+            **kwargs: Additional keyword-arguments to pass to
+                `theano.function()`.
+        """
+        self._fn = f
+
+        self._x = T.dvector("x")
+        self._u = T.dvector("u")
+        self._i = T.dvector("i")
+
+        inputs = [self._x, self._u, self._i]
+        self._tensor = f(self._x, self._u, self._i)
+
+        self._state_size = state_size
+        self._action_size = action_size
+
+        self._J_x, self._J_u, _ = batch_jacobian(f, inputs, state_size)
+        self._f = as_function(self._tensor, inputs, name="f", **kwargs)
+
+        self._f_x = as_function(self._J_x, inputs, name="f_x", **kwargs)
+        self._f_u = as_function(self._J_u, inputs, name="f_u", **kwargs)
+
+        super(BatchAutoDiffDynamics, self).__init__()
+
+    @property
+    def state_size(self):
+        """State size."""
+        return self._state_size
+
+    @property
+    def action_size(self):
+        """Action size."""
+        return self._action_size
+
+    @property
+    def has_hessians(self):
+        """Whether the second order derivatives are available."""
+        return False
+
+    @property
+    def tensor(self):
+        """The dynamics model variable."""
+        return self._tensor
+
+    @property
+    def x(self):
+        """The state variables."""
+        return self._x
+
+    @property
+    def u(self):
+        """The control variables."""
+        return self._u
+
+    @property
+    def i(self):
+        """The time step variable."""
+        return self._i
+
+    def f(self, x, u, i):
+        """Dynamics model.
+
+        Args:
+            x: Current state [state_size].
+            u: Current control [action_size].
+            i: Current time step.
+
+        Returns:
+            Next state [state_size].
+        """
+        return self._f(x, u, np.array([i]))
+
+    def f_x(self, x, u, i):
+        """Partial derivative of dynamics model with respect to x.
+
+        Args:
+            x: Current state [state_size].
+            u: Current control [action_size].
+            i: Current time step.
+
+        Returns:
+            df/dx [state_size, state_size].
+        """
+        return self._f_x(x, u, np.array([i]))
+
+    def f_u(self, x, u, i):
+        """Partial derivative of dynamics model with respect to u.
+
+        Args:
+            x: Current state [state_size].
+            u: Current control [action_size].
+            i: Current time step.
+
+        Returns:
+            df/du [state_size, action_size].
+        """
+        return self._f_u(x, u, np.array([i]))
+
+    def f_xx(self, x, u, i):
+        """Second partial derivative of dynamics model with respect to x.
+
+        Args:
+            x: Current state [state_size].
+            u: Current control [action_size].
+            i: Current time step.
+
+        Returns:
+            d^2f/dx^2 [state_size, state_size, state_size].
+        """
+        raise NotImplementedError(
+            "Hessians are not supported in BatchAutoDiffDynamics yet")
+
+    def f_ux(self, x, u, i):
+        """Second partial derivative of dynamics model with respect to u and x.
+
+        Args:
+            x: Current state [state_size].
+            u: Current control [action_size].
+            i: Current time step.
+
+        Returns:
+            d^2f/dudx [state_size, action_size, state_size].
+        """
+        raise NotImplementedError(
+            "Hessians are not supported in BatchAutoDiffDynamics yet")
+
+    def f_uu(self, x, u, i):
+        """Second partial derivative of dynamics model with respect to u.
+
+        Args:
+            x: Current state [state_size].
+            u: Current control [action_size].
+            i: Current time step.
+
+        Returns:
+            d^2f/du^2 [state_size, action_size, action_size].
+        """
+        raise NotImplementedError(
+            "Hessians are not supported in BatchAutoDiffDynamics yet")
 
 
 class FiniteDiffDynamics(Dynamics):

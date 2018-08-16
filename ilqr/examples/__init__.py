@@ -1,2 +1,5 @@
-# -*- coding: utf-8 -*-
 """Example models."""
+
+from . import cartpole, pendulum
+
+__all__ = ["cartpole", "pendulum"]

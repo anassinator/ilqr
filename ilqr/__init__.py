@@ -1,8 +1,6 @@
-# -*- coding: utf-8 -*-
 """Iterative Linear Quadratic Regulator."""
 
-__version__ = "0.1.0"
-
+from . import autodiff, cost, dynamics
 from .controller import iLQR, RecedingHorizonController
 
-__all__ = ["iLQR", "RecedingHorizonController"]
+__all__ = ["iLQR", "RecedingHorizonController", "autodiff", "cost", "dynamics"]

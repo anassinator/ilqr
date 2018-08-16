@@ -1,12 +1,11 @@
-# -*- coding: utf-8 -*-
 """Cartpole example."""
 
 import numpy as np
 import theano.tensor as T
-from ..dynamics import AutoDiffDynamics, tensor_constrain
+from ..dynamics import BatchAutoDiffDynamics, tensor_constrain
 
 
-class CartpoleDynamics(AutoDiffDynamics):
+class CartpoleDynamics(BatchAutoDiffDynamics):
 
     """Cartpole auto-differentiated dynamics model."""
 
@@ -37,55 +36,51 @@ class CartpoleDynamics(AutoDiffDynamics):
         Note:
             state: [x, x', sin(theta), cos(theta), theta']
             action: [F]
-            theta: 0 is pointing up and increasing clockwise. 
+            theta: 0 is pointing up and increasing clockwise.
         """
         self.constrained = constrain
         self.min_bounds = min_bounds
         self.max_bounds = max_bounds
 
-        # Define inputs.
-        x = T.dscalar("x")
-        x_dot = T.dscalar("x_dot")
-        sin_theta = T.dscalar("sin_theta")
-        cos_theta = T.dscalar("cos_theta")
-        theta_dot = T.dscalar("theta_dot")
-        u = T.dscalar("u")
+        def f(x, u, i):
+            # Constrain action space.
+            if constrain:
+                u = tensor_constrain(u, min_bounds, max_bounds)
 
-        x_inputs = [x, x_dot, sin_theta, cos_theta, theta_dot]
-        u_inputs = [u]
+            x_ = x[..., 0]
+            x_dot = x[..., 1]
+            sin_theta = x[..., 2]
+            cos_theta = x[..., 3]
+            theta_dot = x[..., 4]
+            F = u[..., 0]
 
-        # Constrain action space.
-        if constrain:
-            F = tensor_constrain(u, min_bounds, max_bounds)
-        else:
-            F = u
+            # Define dynamics model as per Razvan V. Florian's
+            # "Correct equations for the dynamics of the cart-pole system".
+            # Friction is neglected.
 
-        # Define dynamics model as per Razvan V. Florian's
-        # "Correct equations for the dynamics of the cart-pole system".
-        # Friction is neglected.
+            # Eq. (23)
+            temp = (F + mp * l * theta_dot**2 * sin_theta) / (mc + mp)
+            numerator = g * sin_theta - cos_theta * temp
+            denominator = l * (4.0 / 3.0 - mp * cos_theta**2 / (mc + mp))
+            theta_dot_dot = numerator / denominator
 
-        # Eq. (23)
-        temp = (F + mp * l * theta_dot**2 * sin_theta) / (mc + mp)
-        numerator = g * sin_theta - cos_theta * temp
-        denominator = l * (4.0 / 3.0 - mp * cos_theta**2 / (mc + mp))
-        theta_dot_dot = numerator / denominator
+            # Eq. (24)
+            x_dot_dot = temp - mp * l * theta_dot_dot * cos_theta / (mc + mp)
 
-        # Eq. (24)
-        x_dot_dot = temp - mp * l * theta_dot_dot * cos_theta / (mc + mp)
+            # Deaugment state for dynamics.
+            theta = T.arctan2(sin_theta, cos_theta)
+            next_theta = theta + theta_dot * dt
 
-        # Deaugment state for dynamics.
-        theta = T.arctan2(sin_theta, cos_theta)
-        next_theta = theta + theta_dot * dt
+            return T.stack([
+                x_ + x_dot * dt,
+                x_dot + x_dot_dot * dt,
+                T.sin(next_theta),
+                T.cos(next_theta),
+                theta_dot + theta_dot_dot * dt,
+            ]).T
 
-        f = T.stack([
-            x + x_dot * dt,
-            x_dot + x_dot_dot * dt,
-            T.sin(next_theta),
-            T.cos(next_theta),
-            theta_dot + theta_dot_dot * dt,
-        ])
-
-        super(CartpoleDynamics, self).__init__(f, x_inputs, u_inputs, **kwargs)
+        super(CartpoleDynamics, self).__init__(
+            f, state_size=5, action_size=1, **kwargs)
 
     @classmethod
     def augment_state(cls, state):
@@ -105,10 +100,10 @@ class CartpoleDynamics(AutoDiffDynamics):
         if state.ndim == 1:
             x, x_dot, theta, theta_dot = state
         else:
-            x = state[:, 0].reshape(-1, 1)
-            x_dot = state[:, 1].reshape(-1, 1)
-            theta = state[:, 2].reshape(-1, 1)
-            theta_dot = state[:, 3].reshape(-1, 1)
+            x = state[..., 0].reshape(-1, 1)
+            x_dot = state[..., 1].reshape(-1, 1)
+            theta = state[..., 2].reshape(-1, 1)
+            theta_dot = state[..., 3].reshape(-1, 1)
 
         return np.hstack([x, x_dot, np.sin(theta), np.cos(theta), theta_dot])
 
@@ -130,11 +125,11 @@ class CartpoleDynamics(AutoDiffDynamics):
         if state.ndim == 1:
             x, x_dot, sin_theta, cos_theta, theta_dot = state
         else:
-            x = state[:, 0].reshape(-1, 1)
-            x_dot = state[:, 1].reshape(-1, 1)
-            sin_theta = state[:, 2].reshape(-1, 1)
-            cos_theta = state[:, 3].reshape(-1, 1)
-            theta_dot = state[:, 4].reshape(-1, 1)
+            x = state[..., 0].reshape(-1, 1)
+            x_dot = state[..., 1].reshape(-1, 1)
+            sin_theta = state[..., 2].reshape(-1, 1)
+            cos_theta = state[..., 3].reshape(-1, 1)
+            theta_dot = state[..., 4].reshape(-1, 1)
 
         theta = np.arctan2(sin_theta, cos_theta)
         return np.hstack([x, x_dot, theta, theta_dot])

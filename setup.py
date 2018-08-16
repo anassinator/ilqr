@@ -2,9 +2,7 @@
 """iLQR setup."""
 
 import os
-from setuptools import setup
-
-from ilqr import __version__
+from setuptools import setup, find_packages
 
 
 def read(fname):
@@ -21,23 +19,30 @@ def read(fname):
 
 BASE_URL = "https://github.com/anassinator/ilqr"
 INSTALL_REQUIRES = [
-    "numpy==1.14.2",
-    "scipy==1.0.0",
-    "six==1.11.0",
-    "Theano==1.0.1",
+    "numpy>=1.14.2",
+    "scipy>=1.0.0",
+    "six>=1.11.0",
+    "Theano>=1.0.1",
 ]
+
+# Parse version information.
+# yapf: disable
+version_info = {}
+exec(read("ilqr/__version__.py"), version_info)
+version = version_info["__version__"]
+# yapf: enable
 
 setup(
     name="ilqr",
-    version=__version__,
+    version=version,
     description="Auto-differentiated Iterative Linear Quadratic Regulator",
     long_description=read("README.rst"),
     author="Anass Al",
-    author_email="mr@anassinator.com",
+    author_email="dev@anassinator.com",
     license="GPLv3",
     url=BASE_URL,
-    download_url="{}/tarball/{}".format(BASE_URL, __version__),
-    packages=["ilqr", "ilqr.examples"],
+    download_url="{}/tarball/{}".format(BASE_URL, version),
+    packages=find_packages(),
     zip_safe=True,
     install_requires=INSTALL_REQUIRES,
     classifiers=[

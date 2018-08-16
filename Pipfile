@@ -1,21 +1,15 @@
 [[source]]
-
 url = "https://pypi.python.org/simple"
 verify_ssl = true
 name = "pypi"
 
-
 [packages]
-
-numpy = "==1.14.2"
-scipy = "==1.0.0"
-six = "==1.11.0"
-Theano = "==1.0.1"
-
+numpy = ">=1.14.2"
+scipy = ">=1.0.0"
+six = ">=1.11.0"
+theano = ">=1.0.1"
 
 [dev-packages]
-
-
+yapf = "==0.22.0"
 
 [requires]
-

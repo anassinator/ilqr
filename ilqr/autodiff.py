@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Autodifferentiation helper methods."""
 
 import theano
@@ -31,6 +30,39 @@ def jacobian_vector(expr, wrt, size):
         Theano tensor.
     """
     return _tensor_map(lambda f: jacobian_scalar(f, wrt), expr, size)
+
+
+def batch_jacobian(f, wrt, size=None, *args, **kwargs):
+    """Computes the jacobian of f(x) w.r.t. x in parallel.
+
+    Args:
+        f: Symbolic function.
+        x: Variables to differentiate with respect to.
+        size: Expected vector size of f(x).
+        *args: Additional positional arguments to pass to `f()`.
+        **kwargs: Additional key-word arguments to pass to `f()`.
+
+    Returns:
+        Theano tensor.
+    """
+    if isinstance(wrt, T.TensorVariable):
+        if size is None:
+            y = f(wrt, *args, **kwargs).shape[-1]
+        x_rep = T.tile(wrt, (size, 1))
+        y_rep = f(x_rep, *args, **kwargs)
+    else:
+        if size is None:
+            size = f(*wrt, *args, **kwargs).shape[-1]
+        x_rep = [T.tile(x, (size, 1)) for x in wrt]
+        y_rep = f(*x_rep, *args, **kwargs)
+
+    J = T.grad(
+        cost=None,
+        wrt=x_rep,
+        known_grads={y_rep: T.identity_like(y_rep)},
+        disconnected_inputs="ignore",
+    )
+    return J
 
 
 def hessian_scalar(expr, wrt):

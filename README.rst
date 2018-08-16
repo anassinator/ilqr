@@ -91,15 +91,60 @@ Automatic differentiation
 
   # Compile the dynamics.
   # NOTE: This can be slow as it's computing and compiling the derivatives.
-  # But that's okay since it's only a one-time cost on startup. You could save
-  # a serialized version of this object to reuse on the next startup in order
-  # to avoid incurring this cost every time.
+  # But that's okay since it's only a one-time cost on startup.
   dynamics = AutoDiffDynamics(f, x_inputs, u_inputs)
 
 *Note*: If you want to be able to use the Hessians (:code:`f_xx`, :code:`f_ux`,
 and :code:`f_uu`), you need to pass the :code:`hessians=True` argument to the
 constructor. This will increase compilation time. Note that :code:`iLQR` does
 not require second-order derivatives to function.
+
+Batch automatic differentiation
+"""""""""""""""""""""""""""""""
+
+.. code-block:: python
+
+  import theano.tensor as T
+  from ilqr.dynamics import BatchAutoDiffDynamics
+
+  state_size = 2  # [position, velocity]
+  action_size = 1  # [force]
+
+  dt = 0.01  # Discrete time-step in seconds.
+  m = 1.0  # Mass in kg.
+  alpha = 0.1  # Friction coefficient.
+
+  def f(x, u, i):
+      """Batched implementation of the dynamics model.
+
+      Args:
+          x: State vector [*, state_size].
+          u: Control vector [*, action_size].
+          i: Current time step [*, 1].
+
+      Returns:
+          Next state vector [*, state_size].
+      """
+      x_ = x[..., 0]
+      x_dot = x[..., 1]
+      F = u[..., 0]
+
+      # Acceleration.
+      x_dot_dot = x_dot * (1 - alpha * dt / m) + F * dt / m
+
+      # Discrete dynamics model definition.
+      return T.stack([
+          x_ + x_dot * dt,
+          x_dot + x_dot_dot * dt,
+      ]).T
+
+  # Compile the dynamics.
+  # NOTE: This can be slow as it's computing and compiling the derivatives.
+  # But that's okay since it's only a one-time cost on startup.
+  dynamics = BatchAutoDiffDynamics(f, state_size, action_size)
+
+*Note*: This is a faster version of :code:`AutoDiffDynamics` that doesn't
+support Hessians.
 
 Finite difference approximation
 """""""""""""""""""""""""""""""
@@ -133,8 +178,8 @@ Finite difference approximation
       x_dot_dot = x_dot * (1 - alpha * dt / m) + F * dt / m
 
       return np.array([
-        x + x_dot * dt,
-        x_dot + x_dot_dot * dt,
+          x + x_dot * dt,
+          x_dot + x_dot_dot * dt,
       ])
 
   # NOTE: Unlike with AutoDiffDynamics, this is instantaneous, but will not be
@@ -202,6 +247,9 @@ convenience, an implementation of this cost function is made available as the
   import numpy as np
   from ilqr.cost import QRCost
 
+  state_size = 2  # [position, velocity]
+  action_size = 1  # [force]
+
   # The coefficients weigh how much your state error is worth to you vs
   # the size of your controls. You can favor a solution that uses smaller
   # controls by increasing R's coefficient.
@@ -238,10 +286,46 @@ Automatic differentiation
 
   # Compile the cost.
   # NOTE: This can be slow as it's computing and compiling the derivatives.
-  # But that's okay since it's only a one-time cost on startup. You could save
-  # a serialized version of this object to reuse on the next startup in order
-  # to avoid incurring this cost every time.
+  # But that's okay since it's only a one-time cost on startup.
   cost = AutoDiffCost(l, l_terminal, x_inputs, u_inputs)
+
+Batch automatic differentiation
+"""""""""""""""""""""""""""""""
+
+.. code-block:: python
+
+  import theano.tensor as T
+  from ilqr.cost import BatchAutoDiffCost
+
+  def cost_function(x, u, i, terminal):
+      """Batched implementation of the quadratic cost function.
+
+      Args:
+          x: State vector [*, state_size].
+          u: Control vector [*, action_size].
+          i: Current time step [*, 1].
+          terminal: Whether to compute the terminal cost.
+
+      Returns:
+          Instantaneous cost [*].
+      """
+      Q_ = Q_terminal if terminal else Q
+      l = x.dot(Q_).dot(x.T)
+      if l.ndim == 2:
+          l = T.diag(l)
+
+      if not terminal:
+          l_u = u.dot(R).dot(u.T)
+          if l_u.ndim == 2:
+              l_u = T.diag(l_u)
+          l += l_u
+
+      return l
+
+  # Compile the cost.
+  # NOTE: This can be slow as it's computing and compiling the derivatives.
+  # But that's okay since it's only a one-time cost on startup.
+  cost = BatchAutoDiffCost(cost_function, state_size, action_size)
 
 Finite difference approximation
 """""""""""""""""""""""""""""""

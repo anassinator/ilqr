@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Controllers."""
 
 import six
@@ -245,11 +244,10 @@ class iLQR(BaseController):
             u = us[i]
 
             Q_x, Q_u, Q_xx, Q_ux, Q_uu = self._Q(x, u, V_x, V_xx, i)
-            Q_uu_inv = np.linalg.pinv(Q_uu)
 
             # Eq (6).
-            k[i] = -Q_uu_inv.dot(Q_u)
-            K[i] = -Q_uu_inv.dot(Q_ux)
+            k[i] = -np.linalg.solve(Q_uu, Q_u)
+            K[i] = -np.linalg.solve(Q_uu, Q_ux)
 
             # Eq (11b).
             V_x = Q_x + K[i].T.dot(Q_uu).dot(k[i])

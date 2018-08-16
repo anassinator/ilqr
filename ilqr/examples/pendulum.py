@@ -1,12 +1,11 @@
-# -*- coding: utf-8 -*-
 """Inverted pendulum example."""
 
 import numpy as np
 import theano.tensor as T
-from ..dynamics import AutoDiffDynamics, tensor_constrain
+from ..dynamics import BatchAutoDiffDynamics, tensor_constrain
 
 
-class InvertedPendulumDynamics(AutoDiffDynamics):
+class InvertedPendulumDynamics(BatchAutoDiffDynamics):
 
     """Inverted pendulum auto-differentiated dynamics model."""
 
@@ -30,7 +29,7 @@ class InvertedPendulumDynamics(AutoDiffDynamics):
             l: Pendulum length [m].
             g: Gravity acceleration [m/s^2].
             **kwargs: Additional key-word arguments to pass to the
-                AutoDiffDynamics constructor.
+                BatchAutoDiffDynamics constructor.
 
         Note:
             state: [sin(theta), cos(theta), theta']
@@ -41,34 +40,32 @@ class InvertedPendulumDynamics(AutoDiffDynamics):
         self.min_bounds = min_bounds
         self.max_bounds = max_bounds
 
-        # Define inputs.
-        sin_theta = T.dscalar("sin_theta")
-        cos_theta = T.dscalar("cos_theta")
-        theta_dot = T.dscalar("theta_dot")
-        u = T.dscalar("u")
+        def f(x, u, i):
+            # Constrain action space.
+            if constrain:
+                u = tensor_constrain(u, min_bounds, max_bounds)
 
-        # Constrain action space.
-        if constrain:
-            torque = tensor_constrain(u, min_bounds, max_bounds)
-        else:
-            torque = u
+            sin_theta = x[..., 0]
+            cos_theta = x[..., 1]
+            theta_dot = x[..., 2]
+            torque = u[..., 0]
 
-        # Define acceleration.
-        theta_dot_dot = -3.0 * g / (2 * l) * sin_theta
-        theta_dot_dot += 3.0 / (m * l**2) * torque
+            # Define acceleration.
+            theta_dot_dot = -3.0 * g / (2 * l) * sin_theta
+            theta_dot_dot += 3.0 / (m * l**2) * torque
 
-        # Deal with angle wrap-around.
-        theta = T.arctan2(sin_theta, cos_theta)
-        next_theta = theta + theta_dot * dt
+            # Deal with angle wrap-around.
+            theta = T.arctan2(sin_theta, cos_theta)
+            next_theta = theta + theta_dot * dt
 
-        f = T.stack([
-            T.sin(next_theta),
-            T.cos(next_theta),
-            theta_dot + theta_dot_dot * dt,
-        ])
+            return T.stack([
+                T.sin(next_theta),
+                T.cos(next_theta),
+                theta_dot + theta_dot_dot * dt,
+            ]).T
 
         super(InvertedPendulumDynamics, self).__init__(
-            f, [sin_theta, cos_theta, theta_dot], [u], **kwargs)
+            f, state_size=3, action_size=1, **kwargs)
 
     @classmethod
     def augment_state(cls, state):
@@ -88,8 +85,8 @@ class InvertedPendulumDynamics(AutoDiffDynamics):
         if state.ndim == 1:
             theta, theta_dot = state
         else:
-            theta = state[:, 0].reshape(-1, 1)
-            theta_dot = state[:, 1].reshape(-1, 1)
+            theta = state[..., 0].reshape(-1, 1)
+            theta_dot = state[..., 1].reshape(-1, 1)
 
         return np.hstack([np.sin(theta), np.cos(theta), theta_dot])
 
@@ -111,9 +108,9 @@ class InvertedPendulumDynamics(AutoDiffDynamics):
         if state.ndim == 1:
             sin_theta, cos_theta, theta_dot = state
         else:
-            sin_theta = state[:, 0].reshape(-1, 1)
-            cos_theta = state[:, 1].reshape(-1, 1)
-            theta_dot = state[:, 2].reshape(-1, 1)
+            sin_theta = state[..., 0].reshape(-1, 1)
+            cos_theta = state[..., 1].reshape(-1, 1)
+            theta_dot = state[..., 2].reshape(-1, 1)
 
         theta = np.arctan2(sin_theta, cos_theta)
         return np.hstack([theta, theta_dot])
