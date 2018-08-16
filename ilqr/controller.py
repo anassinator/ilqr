@@ -97,18 +97,19 @@ class iLQR(BaseController):
         alphas = 1.1**(-np.arange(10)**2)
 
         us = us_init.copy()
-        xs = self._forward_rollout(x0, us)
         k = self._k
         K = self._K
-
-        J_opt = self._trajectory_cost(xs, us)
 
         converged = False
         for iteration in range(n_iterations):
             accepted = False
 
+            xs, F_x, F_u, L, L_x, L_u, L_xx, L_ux, L_uu = self._forward_rollout(
+                x0, us)
+            J_opt = L.sum()
+
             try:
-                k, K = self._backward_pass(xs, us)
+                k, K = self._backward_pass(F_x, F_u, L_x, L_u, L_xx, L_ux, L_uu)
 
                 # Backtracking line search.
                 for alpha in alphas:
@@ -212,16 +213,61 @@ class iLQR(BaseController):
             us: Control path [N, action_size].
 
         Returns:
-            State path [N+1, state_size].
+            Tuple of:
+                xs: State path [N+1, state_size].
+                F_x: Jacobian of state path w.r.t. x
+                    [N, state_size, state_size].
+                F_u: Jacobian of state path w.r.t. u
+                    [N, state_size, action_size].
+                L: Cost path [N+1].
+                L_x: Jacobian of cost path w.r.t. x [N+1, state_size].
+                L_u: Jacobian of cost path w.r.t. u [N, action_size].
+                L_xx: Hessian of cost path w.r.t. x, x
+                    [N+1, state_size, state_size].
+                L_ux: Hessian of cost path w.r.t. u, x
+                    [N, action_size, state_size].
+                L_uu: Hessian of cost path w.r.t. u, u
+                    [N, action_size, action_size].
         """
-        xs = np.array([x0])
+        state_size = self.dynamics.state_size
+        action_size = self.dynamics.action_size
+        N = us.shape[0]
+
+        xs = np.empty((N + 1, state_size))
+        F_x = np.empty((N, state_size, state_size))
+        F_u = np.empty((N, state_size, action_size))
+
+        L = np.empty(N + 1)
+        L_x = np.empty((N + 1, state_size))
+        L_u = np.empty((N, action_size))
+        L_xx = np.empty((N + 1, state_size, state_size))
+        L_ux = np.empty((N, action_size, state_size))
+        L_uu = np.empty((N, action_size, action_size))
+
+        xs[0] = x0
         for i in range(self.N):
-            x_new = self.dynamics.f(xs[-1], us[i], i)
-            xs = np.append(xs, [x_new], axis=0)
+            x = xs[i]
+            u = us[i]
 
-        return xs
+            xs[i + 1] = self.dynamics.f(x, u, i)
+            F_x[i] = self.dynamics.f_x(x, u, i)
+            F_u[i] = self.dynamics.f_u(x, u, i)
 
-    def _backward_pass(self, xs, us):
+            L[i] = self.cost.l(x, u, i, terminal=False)
+            L_x[i] = self.cost.l_x(x, u, i, terminal=False)
+            L_u[i] = self.cost.l_u(x, u, i, terminal=False)
+            L_xx[i] = self.cost.l_xx(x, u, i, terminal=False)
+            L_ux[i] = self.cost.l_ux(x, u, i, terminal=False)
+            L_uu[i] = self.cost.l_uu(x, u, i, terminal=False)
+
+        x = xs[-1]
+        L[-1] = self.cost.l(x, None, N, terminal=True)
+        L_x[-1] = self.cost.l_x(x, None, N, terminal=True)
+        L_xx[-1] = self.cost.l_xx(x, None, N, terminal=True)
+
+        return xs, F_x, F_u, L, L_x, L_u, L_xx, L_ux, L_uu
+
+    def _backward_pass(self, F_x, F_u, L_x, L_u, L_xx, L_ux, L_uu):
         """Computes the feedforward and feedback gains k and K.
 
         Args:
@@ -233,17 +279,16 @@ class iLQR(BaseController):
                 k: feedforward gains [N, action_size].
                 K: feedback gains [N, action_size, state_size].
         """
-        V_x = self.cost.l_x(xs[-1], None, self.N, terminal=True)
-        V_xx = self.cost.l_xx(xs[-1], None, self.N, terminal=True)
+        V_x = L_x[-1]
+        V_xx = L_xx[-1]
 
-        k = np.zeros_like(self._k)
-        K = np.zeros_like(self._K)
+        k = np.empty_like(self._k)
+        K = np.empty_like(self._K)
 
         for i in range(self.N - 1, -1, -1):
-            x = xs[i]
-            u = us[i]
-
-            Q_x, Q_u, Q_xx, Q_ux, Q_uu = self._Q(x, u, V_x, V_xx, i)
+            Q_x, Q_u, Q_xx, Q_ux, Q_uu = self._Q(F_x[i], F_u[i], L_x[i], L_u[i],
+                                                 L_xx[i], L_ux[i], L_uu[i], V_x,
+                                                 V_xx)
 
             # Eq (6).
             k[i] = -np.linalg.solve(Q_uu, Q_u)
@@ -260,7 +305,7 @@ class iLQR(BaseController):
 
         return np.array(k), np.array(K)
 
-    def _Q(self, x, u, V_x, V_xx, i):
+    def _Q(self, f_x, f_u, l_x, l_u, l_xx, l_ux, l_uu, V_x, V_xx):
         """Computes second order expansion.
 
         Args:
@@ -279,15 +324,6 @@ class iLQR(BaseController):
                 Q_ux: [action_size, state_size].
                 Q_uu: [action_size, action_size].
         """
-        f_x = self.dynamics.f_x(x, u, i)
-        f_u = self.dynamics.f_u(x, u, i)
-
-        l_x = self.cost.l_x(x, u, i)
-        l_u = self.cost.l_u(x, u, i)
-        l_xx = self.cost.l_xx(x, u, i)
-        l_ux = self.cost.l_ux(x, u, i)
-        l_uu = self.cost.l_uu(x, u, i)
-
         # Eqs (5a), (5b) and (5c).
         Q_x = l_x + f_x.T.dot(V_x)
         Q_u = l_u + f_u.T.dot(V_x)

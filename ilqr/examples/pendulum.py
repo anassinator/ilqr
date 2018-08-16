@@ -34,7 +34,7 @@ class InvertedPendulumDynamics(BatchAutoDiffDynamics):
         Note:
             state: [sin(theta), cos(theta), theta']
             action: [torque]
-            theta: pi is pointing up.
+            theta: 0 is pointing up and increasing counter-clockwise.
         """
         self.constrained = constrain
         self.min_bounds = min_bounds
@@ -50,12 +50,13 @@ class InvertedPendulumDynamics(BatchAutoDiffDynamics):
             theta_dot = x[..., 2]
             torque = u[..., 0]
 
-            # Define acceleration.
-            theta_dot_dot = -3.0 * g / (2 * l) * sin_theta
-            theta_dot_dot += 3.0 / (m * l**2) * torque
-
             # Deal with angle wrap-around.
             theta = T.arctan2(sin_theta, cos_theta)
+
+            # Define acceleration.
+            theta_dot_dot = -3.0 * g / (2 * l) * T.sin(theta + np.pi)
+            theta_dot_dot += 3.0 / (m * l**2) * torque
+
             next_theta = theta + theta_dot * dt
 
             return T.stack([
