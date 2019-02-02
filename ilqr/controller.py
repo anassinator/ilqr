@@ -448,6 +448,10 @@ class RecedingHorizonController(object):
         """
         self._x = x0
         self._controller = controller
+        self._random = np.random.RandomState()
+
+    def seed(self, seed):
+        self._random.seed(seed)
 
     def set_state(self, x):
         """Sets the current state of the controller.
@@ -507,6 +511,6 @@ class RecedingHorizonController(object):
             # Set up next action path seed by simply moving along the current
             # optimal path and appending random unoptimal values at the end.
             us_start = us[step_size:]
-            us_end = np.random.uniform(-1, 1, (step_size, action_size))
+            us_end = self._random.uniform(-1, 1, (step_size, action_size))
             us_init = np.vstack([us_start, us_end])
             n_iterations = subsequent_n_iterations
