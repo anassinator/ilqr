@@ -416,7 +416,7 @@ class BatchAutoDiffCost(Cost):
 
         # Terminal cost only depends on x, so we only need to evaluate the x
         # partial derivatives.
-        l_tensor_term = f(x, None, i, terminal=True)
+        l_tensor_term = f(x_rep_1, None, i, terminal=True)[0]
         J_x_term, _ = T.grad(
             l_tensor_term, inputs_term, disconnected_inputs="ignore")
 
