@@ -356,7 +356,7 @@ class BatchAutoDiffDynamics(Dynamics):
 
         self._x = T.dvector("x")
         self._u = T.dvector("u")
-        self._i = T.dvector("i")
+        self._i = T.dscalar("i")
 
         inputs = [self._x, self._u, self._i]
         self._tensor = f(self._x, self._u, self._i)
@@ -418,7 +418,7 @@ class BatchAutoDiffDynamics(Dynamics):
         Returns:
             Next state [state_size].
         """
-        return self._f(x, u, np.array([i]))
+        return self._f(x, u, i)
 
     def f_x(self, x, u, i):
         """Partial derivative of dynamics model with respect to x.
@@ -431,7 +431,7 @@ class BatchAutoDiffDynamics(Dynamics):
         Returns:
             df/dx [state_size, state_size].
         """
-        return self._f_x(x, u, np.array([i]))
+        return self._f_x(x, u, i)
 
     def f_u(self, x, u, i):
         """Partial derivative of dynamics model with respect to u.
@@ -444,7 +444,7 @@ class BatchAutoDiffDynamics(Dynamics):
         Returns:
             df/du [state_size, action_size].
         """
-        return self._f_u(x, u, np.array([i]))
+        return self._f_u(x, u, i)
 
     def f_xx(self, x, u, i):
         """Second partial derivative of dynamics model with respect to x.

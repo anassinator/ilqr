@@ -353,7 +353,7 @@ class BatchAutoDiffCost(Cost):
         # Prepare inputs.
         self._x = x = T.dvector("x")
         self._u = u = T.dvector("u")
-        self._i = i = T.dvector("i")
+        self._i = i = T.dscalar("i")
         inputs = [self._x, self._u, self._i]
         inputs_term = [self._x, self._i]
 
@@ -481,9 +481,9 @@ class BatchAutoDiffCost(Cost):
             Instantaneous cost (scalar).
         """
         if terminal:
-            return np.asscalar(self._l_term(x, np.array([i])))
+            return np.asscalar(self._l_term(x, i))
 
-        return np.asscalar(self._l(x, u, np.array([i])))
+        return np.asscalar(self._l(x, u, i))
 
     def l_x(self, x, u, i, terminal=False):
         """Partial derivative of cost function with respect to x.
@@ -498,9 +498,9 @@ class BatchAutoDiffCost(Cost):
             dl/dx [state_size].
         """
         if terminal:
-            return np.array(self._l_x_term(x, np.array([i])))
+            return np.array(self._l_x_term(x, i))
 
-        return np.array(self._l_x(x, u, np.array([i])))
+        return np.array(self._l_x(x, u, i))
 
     def l_u(self, x, u, i, terminal=False):
         """Partial derivative of cost function with respect to u.
@@ -518,7 +518,7 @@ class BatchAutoDiffCost(Cost):
             # Not a function of u, so the derivative is zero.
             return np.zeros(self._action_size)
 
-        return np.array(self._l_u(x, u, np.array([i])))
+        return np.array(self._l_u(x, u, i))
 
     def l_xx(self, x, u, i, terminal=False):
         """Second partial derivative of cost function with respect to x.
@@ -533,9 +533,9 @@ class BatchAutoDiffCost(Cost):
             d^2l/dx^2 [state_size, state_size].
         """
         if terminal:
-            return np.array(self._l_xx_term(x, np.array([i])))
+            return np.array(self._l_xx_term(x, i))
 
-        return np.array(self._l_xx(x, u, np.array([i])))
+        return np.array(self._l_xx(x, u, i))
 
     def l_ux(self, x, u, i, terminal=False):
         """Second partial derivative of cost function with respect to u and x.
@@ -553,7 +553,7 @@ class BatchAutoDiffCost(Cost):
             # Not a function of u, so the derivative is zero.
             return np.zeros((self._action_size, self._state_size))
 
-        return np.array(self._l_ux(x, u, np.array([i])))
+        return np.array(self._l_ux(x, u, i))
 
     def l_uu(self, x, u, i, terminal=False):
         """Second partial derivative of cost function with respect to u.
@@ -571,7 +571,7 @@ class BatchAutoDiffCost(Cost):
             # Not a function of u, so the derivative is zero.
             return np.zeros((self._action_size, self._action_size))
 
-        return np.array(self._l_uu(x, u, np.array([i])))
+        return np.array(self._l_uu(x, u, i))
 
 
 class FiniteDiffCost(Cost):
