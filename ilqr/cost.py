@@ -347,8 +347,8 @@ class BatchAutoDiffCost(Cost):
                 `theano.function()`.
         """
         self._fn = f
-        self._state_size = x_dim = state_size
-        self._action_size = u_dim = action_size
+        self._state_size = state_size
+        self._action_size = action_size
 
         # Prepare inputs.
         self._x = x = T.dvector("x")
@@ -360,14 +360,10 @@ class BatchAutoDiffCost(Cost):
         x_rep_x = T.tile(x, (state_size, 1))
         u_rep_x = T.tile(u, (state_size, 1))
         i_rep_x = T.tile(i, (state_size, 1))
-        inputs_rep_x = [x_rep_x, u_rep_x, i_rep_x]
-        inputs_rep_x_term = [x_rep_x, i_rep_x]
 
         x_rep_u = T.tile(x, (action_size, 1))
         u_rep_u = T.tile(u, (action_size, 1))
         i_rep_u = T.tile(i, (action_size, 1))
-        inputs_rep_u = [x_rep_u, u_rep_u, i_rep_u]
-        inputs_rep_u_term = [x_rep_u, i_rep_u]
 
         x_rep_1 = T.tile(x, (1, 1))
         u_rep_1 = T.tile(u, (1, 1))

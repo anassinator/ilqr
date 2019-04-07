@@ -353,20 +353,21 @@ class BatchAutoDiffDynamics(Dynamics):
                 `theano.function()`.
         """
         self._fn = f
-
-        self._x = T.dvector("x")
-        self._u = T.dvector("u")
-        self._i = T.dscalar("i")
-
-        inputs = [self._x, self._u, self._i]
-        self._tensor = f(self._x, self._u, self._i)
-
         self._state_size = state_size
         self._action_size = action_size
 
-        self._J_x, self._J_u, _ = batch_jacobian(f, inputs, state_size)
+        self._x = x = T.dvector("x")
+        self._u = u = T.dvector("u")
+        self._i = i = T.dscalar("i")
+        inputs = [x, u, i]
+
+        x_rep_1 = T.tile(x, (1, 1))
+        u_rep_1 = T.tile(u, (1, 1))
+        i_rep_1 = T.tile(i, (1, 1))
+        self._tensor = f(x_rep_1, u_rep_1, i_rep_1)
         self._f = as_function(self._tensor, inputs, name="f", **kwargs)
 
+        self._J_x, self._J_u, _ = batch_jacobian(f, inputs, state_size)
         self._f_x = as_function(self._J_x, inputs, name="f_x", **kwargs)
         self._f_u = as_function(self._J_u, inputs, name="f_u", **kwargs)
 
