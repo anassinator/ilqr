@@ -203,9 +203,7 @@ class iLQR(BaseController):
 
         for i in range(self.N):
             # Eq (12).
-            # Applying alpha only on k[i] as in the paper for some reason
-            # doesn't converge.
-            us_new[i] = us[i] + alpha * (k[i] + K[i].dot(xs_new[i] - xs[i]))
+            us_new[i] = us[i] + alpha * k[i] + K[i].dot(xs_new[i] - xs[i])
 
             # Eq (8c).
             xs_new[i + 1] = self.dynamics.f(xs_new[i], us_new[i], i)
