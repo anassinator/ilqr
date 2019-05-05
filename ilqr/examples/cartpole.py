@@ -93,8 +93,10 @@ class CartpoleDynamics(BatchAutoDiffDynamics):
                 theta_dot + theta_dot_dot * dt,
             ]).T
 
-        super(CartpoleDynamics, self).__init__(
-            f, state_size=5, action_size=1, **kwargs)
+        super(CartpoleDynamics, self).__init__(f,
+                                               state_size=5,
+                                               action_size=1,
+                                               **kwargs)
 
     @classmethod
     def augment_state(cls, state):

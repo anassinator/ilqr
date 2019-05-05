@@ -10,6 +10,6 @@ six = ">=1.12.0"
 theano = ">=1.0.4"
 
 [dev-packages]
-yapf = "==0.22.0"
+yapf = "==0.27.0"
 
 [requires]

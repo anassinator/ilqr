@@ -163,30 +163,36 @@ class AutoDiffCost(Cost):
         self._l_x = as_function(self._J[:x_dim], inputs, name="l_x", **kwargs)
         self._l_u = as_function(self._J[x_dim:], inputs, name="l_u", **kwargs)
 
-        self._l_xx = as_function(
-            self._Q[:x_dim, :x_dim], inputs, name="l_xx", **kwargs)
-        self._l_ux = as_function(
-            self._Q[x_dim:, :x_dim], inputs, name="l_ux", **kwargs)
-        self._l_uu = as_function(
-            self._Q[x_dim:, x_dim:], inputs, name="l_uu", **kwargs)
+        self._l_xx = as_function(self._Q[:x_dim, :x_dim],
+                                 inputs,
+                                 name="l_xx",
+                                 **kwargs)
+        self._l_ux = as_function(self._Q[x_dim:, :x_dim],
+                                 inputs,
+                                 name="l_ux",
+                                 **kwargs)
+        self._l_uu = as_function(self._Q[x_dim:, x_dim:],
+                                 inputs,
+                                 name="l_uu",
+                                 **kwargs)
 
         # Terminal cost only depends on x, so we only need to evaluate the x
         # partial derivatives.
         self._J_terminal = jacobian_scalar(l_terminal, x_inputs)
         self._Q_terminal = hessian_scalar(l_terminal, x_inputs)
 
-        self._l_terminal = as_function(
-            l_terminal, terminal_inputs, name="l_term", **kwargs)
-        self._l_x_terminal = as_function(
-            self._J_terminal[:x_dim],
-            terminal_inputs,
-            name="l_term_x",
-            **kwargs)
-        self._l_xx_terminal = as_function(
-            self._Q_terminal[:x_dim, :x_dim],
-            terminal_inputs,
-            name="l_term_xx",
-            **kwargs)
+        self._l_terminal = as_function(l_terminal,
+                                       terminal_inputs,
+                                       name="l_term",
+                                       **kwargs)
+        self._l_x_terminal = as_function(self._J_terminal[:x_dim],
+                                         terminal_inputs,
+                                         name="l_term_x",
+                                         **kwargs)
+        self._l_xx_terminal = as_function(self._Q_terminal[:x_dim, :x_dim],
+                                          terminal_inputs,
+                                          name="l_term_xx",
+                                          **kwargs)
 
         super(AutoDiffCost, self).__init__()
 
@@ -374,63 +380,58 @@ class BatchAutoDiffCost(Cost):
         # Compute the hessians in batches.
         l_tensor_rep_x = f(x_rep_x, u_rep_x, i_rep_x, terminal=False)
         l_tensor_rep_u = f(x_rep_u, u_rep_u, i_rep_u, terminal=False)
-        J_x_rep = T.grad(
-            cost=None,
-            wrt=x_rep_x,
-            known_grads={
-                l_tensor_rep_x: T.ones(state_size),
-            },
-            disconnected_inputs="ignore")
-        J_u_rep = T.grad(
-            cost=None,
-            wrt=u_rep_u,
-            known_grads={
-                l_tensor_rep_u: T.ones(action_size),
-            },
-            disconnected_inputs="ignore")
-        Q_xx = T.grad(
-            cost=None,
-            wrt=x_rep_x,
-            known_grads={
-                J_x_rep: T.eye(state_size),
-            },
-            disconnected_inputs="ignore")
-        Q_ux = T.grad(
-            cost=None,
-            wrt=x_rep_u,
-            known_grads={
-                J_u_rep: T.eye(action_size),
-            },
-            disconnected_inputs="ignore")
-        Q_uu = T.grad(
-            cost=None,
-            wrt=u_rep_u,
-            known_grads={
-                J_u_rep: T.eye(action_size),
-            },
-            disconnected_inputs="warn")
+        J_x_rep = T.grad(cost=None,
+                         wrt=x_rep_x,
+                         known_grads={
+                             l_tensor_rep_x: T.ones(state_size),
+                         },
+                         disconnected_inputs="ignore")
+        J_u_rep = T.grad(cost=None,
+                         wrt=u_rep_u,
+                         known_grads={
+                             l_tensor_rep_u: T.ones(action_size),
+                         },
+                         disconnected_inputs="ignore")
+        Q_xx = T.grad(cost=None,
+                      wrt=x_rep_x,
+                      known_grads={
+                          J_x_rep: T.eye(state_size),
+                      },
+                      disconnected_inputs="ignore")
+        Q_ux = T.grad(cost=None,
+                      wrt=x_rep_u,
+                      known_grads={
+                          J_u_rep: T.eye(action_size),
+                      },
+                      disconnected_inputs="ignore")
+        Q_uu = T.grad(cost=None,
+                      wrt=u_rep_u,
+                      known_grads={
+                          J_u_rep: T.eye(action_size),
+                      },
+                      disconnected_inputs="warn")
 
         # Terminal cost only depends on x, so we only need to evaluate the x
         # partial derivatives.
         l_tensor_term = f(x_rep_1, None, i, terminal=True)[0]
-        J_x_term, _ = T.grad(
-            l_tensor_term, inputs_term, disconnected_inputs="ignore")
+        J_x_term, _ = T.grad(l_tensor_term,
+                             inputs_term,
+                             disconnected_inputs="ignore")
 
         l_tensor_rep_term = f(x_rep_x, None, i_rep_x, terminal=True)
-        J_x_rep_term = T.grad(
-            cost=None,
-            wrt=x_rep_x,
-            known_grads={
-                l_tensor_rep_term: T.ones_like(l_tensor_rep_term),
-            },
-            disconnected_inputs="ignore")
-        Q_xx_term = T.grad(
-            cost=None,
-            wrt=x_rep_x,
-            known_grads={
-                J_x_rep_term: T.eye(state_size),
-            },
-            disconnected_inputs="ignore")
+        J_x_rep_term = T.grad(cost=None,
+                              wrt=x_rep_x,
+                              known_grads={
+                                  l_tensor_rep_term:
+                                      T.ones_like(l_tensor_rep_term),
+                              },
+                              disconnected_inputs="ignore")
+        Q_xx_term = T.grad(cost=None,
+                           wrt=x_rep_x,
+                           known_grads={
+                               J_x_rep_term: T.eye(state_size),
+                           },
+                           disconnected_inputs="ignore")
 
         # Compile all functions.
         self._l = as_function(l_tensor, inputs, name="l", **kwargs)
@@ -440,12 +441,18 @@ class BatchAutoDiffCost(Cost):
         self._l_ux = as_function(Q_ux, inputs, name="l_ux", **kwargs)
         self._l_uu = as_function(Q_uu, inputs, name="l_uu", **kwargs)
 
-        self._l_term = as_function(
-            l_tensor_term, inputs_term, name="l_term", **kwargs)
-        self._l_x_term = as_function(
-            J_x_term, inputs_term, name="l_x_term", **kwargs)
-        self._l_xx_term = as_function(
-            Q_xx_term, inputs_term, name="l_xx_term", **kwargs)
+        self._l_term = as_function(l_tensor_term,
+                                   inputs_term,
+                                   name="l_term",
+                                   **kwargs)
+        self._l_x_term = as_function(J_x_term,
+                                     inputs_term,
+                                     name="l_x_term",
+                                     **kwargs)
+        self._l_xx_term = as_function(Q_xx_term,
+                                      inputs_term,
+                                      name="l_xx_term",
+                                      **kwargs)
 
         super(BatchAutoDiffCost, self).__init__()
 

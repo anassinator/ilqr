@@ -181,20 +181,30 @@ class AutoDiffDynamics(Dynamics):
 
         self._f = as_function(f, inputs, name="f", **kwargs)
 
-        self._f_x = as_function(
-            self._J[:, :x_dim], inputs, name="f_x", **kwargs)
-        self._f_u = as_function(
-            self._J[:, x_dim:], inputs, name="f_u", **kwargs)
+        self._f_x = as_function(self._J[:, :x_dim],
+                                inputs,
+                                name="f_x",
+                                **kwargs)
+        self._f_u = as_function(self._J[:, x_dim:],
+                                inputs,
+                                name="f_u",
+                                **kwargs)
 
         self._has_hessians = hessians
         if hessians:
             self._Q = hessian_vector(f, non_t_inputs, x_dim)
-            self._f_xx = as_function(
-                self._Q[:, :x_dim, :x_dim], inputs, name="f_xx", **kwargs)
-            self._f_ux = as_function(
-                self._Q[:, x_dim:, :x_dim], inputs, name="f_ux", **kwargs)
-            self._f_uu = as_function(
-                self._Q[:, x_dim:, x_dim:], inputs, name="f_uu", **kwargs)
+            self._f_xx = as_function(self._Q[:, :x_dim, :x_dim],
+                                     inputs,
+                                     name="f_xx",
+                                     **kwargs)
+            self._f_ux = as_function(self._Q[:, x_dim:, :x_dim],
+                                     inputs,
+                                     name="f_ux",
+                                     **kwargs)
+            self._f_uu = as_function(self._Q[:, x_dim:, x_dim:],
+                                     inputs,
+                                     name="f_uu",
+                                     **kwargs)
 
         super(AutoDiffDynamics, self).__init__()
 

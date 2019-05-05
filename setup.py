@@ -32,26 +32,25 @@ exec(read("ilqr/__version__.py"), version_info)
 version = version_info["__version__"]
 # yapf: enable
 
-setup(
-    name="ilqr",
-    version=version,
-    description="Auto-differentiated Iterative Linear Quadratic Regulator",
-    long_description=read("README.rst"),
-    author="Anass Al",
-    author_email="dev@anassinator.com",
-    license="GPLv3",
-    url=BASE_URL,
-    download_url="{}/tarball/{}".format(BASE_URL, version),
-    packages=find_packages(),
-    zip_safe=True,
-    install_requires=INSTALL_REQUIRES,
-    classifiers=[
-        "Development Status :: 4 - Beta",
-        "Intended Audience :: Developers",
-        "Intended Audience :: Science/Research",
-        "License :: OSI Approved :: MIT License",
-        "Operating System :: OS Independent",
-        "Programming Language :: Python :: 2",
-        "Programming Language :: Python :: 3",
-        "Topic :: Scientific/Engineering :: Artificial Intelligence",
-    ])
+setup(name="ilqr",
+      version=version,
+      description="Auto-differentiated Iterative Linear Quadratic Regulator",
+      long_description=read("README.rst"),
+      author="Anass Al",
+      author_email="dev@anassinator.com",
+      license="GPLv3",
+      url=BASE_URL,
+      download_url="{}/tarball/{}".format(BASE_URL, version),
+      packages=find_packages(),
+      zip_safe=True,
+      install_requires=INSTALL_REQUIRES,
+      classifiers=[
+          "Development Status :: 4 - Beta",
+          "Intended Audience :: Developers",
+          "Intended Audience :: Science/Research",
+          "License :: OSI Approved :: MIT License",
+          "Operating System :: OS Independent",
+          "Programming Language :: Python :: 2",
+          "Programming Language :: Python :: 3",
+          "Topic :: Scientific/Engineering :: Artificial Intelligence",
+      ])

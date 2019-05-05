@@ -350,9 +350,10 @@ class iLQR(BaseController):
 
         for i in range(self.N - 1, -1, -1):
             if self._use_hessians:
-                Q_x, Q_u, Q_xx, Q_ux, Q_uu = self._Q(
-                    F_x[i], F_u[i], L_x[i], L_u[i], L_xx[i], L_ux[i], L_uu[i],
-                    V_x, V_xx, F_xx[i], F_ux[i], F_uu[i])
+                Q_x, Q_u, Q_xx, Q_ux, Q_uu = self._Q(F_x[i], F_u[i], L_x[i],
+                                                     L_u[i], L_xx[i], L_ux[i],
+                                                     L_uu[i], V_x, V_xx,
+                                                     F_xx[i], F_ux[i], F_uu[i])
             else:
                 Q_x, Q_u, Q_xx, Q_ux, Q_uu = self._Q(F_x[i], F_u[i], L_x[i],
                                                      L_u[i], L_xx[i], L_ux[i],
@@ -501,8 +502,11 @@ class RecedingHorizonController(object):
         action_size = self._controller.dynamics.action_size
         n_iterations = initial_n_iterations
         while True:
-            xs, us = self._controller.fit(
-                self._x, us_init, n_iterations=n_iterations, *args, **kwargs)
+            xs, us = self._controller.fit(self._x,
+                                          us_init,
+                                          n_iterations=n_iterations,
+                                          *args,
+                                          **kwargs)
             self._x = xs[step_size]
             yield xs[:step_size + 1], us[:step_size]
 
