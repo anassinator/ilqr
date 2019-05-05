@@ -14,4 +14,4 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>
 """Version information."""
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
