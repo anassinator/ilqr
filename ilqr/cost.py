@@ -1246,11 +1246,15 @@ class PathQRCostMPC(Cost):
 
     def update_step(self, step_size):
 
-        self.x_path = self.x_path[step_size:]
-        self.u_path = self.u_path[step_size:]
-        self.x_path = np.append(self.x_path, [self.x_path[-1].tolist()], axis=0)
-        self.u_path = np.append(self.u_path, [self.u_path[-1].tolist()], axis=0)
+        x_temp = np.zeros(self.x_path.shape)
+        x_temp[:-1] = self.x_path[1:]
+        x_temp[-1] = self.x_path[-1]
+        self.x_path = x_temp
 
+        u_temp = np.zeros(self.u_path.shape)
+        u_temp[:-1] = self.u_path[1:]
+        u_temp[-1] = self.u_path[-1]
+        self.u_path = u_temp
 
     def l(self, x, u, i, terminal=False):
         """Instantaneous cost function.
