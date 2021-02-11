@@ -1194,6 +1194,7 @@ class PathQsRCost(Cost):
         if terminal:
             return np.zeros_like(self.R)
 
+
         return self._R_plus_R_T
 
 class PathQRCostMPC(Cost):
@@ -1229,8 +1230,8 @@ class PathQRCostMPC(Cost):
         else:
             self.u_path = np.array(u_path)
 
-        assert self.Q.shape == self.Q_terminal.shape, "Q & Q_terminal mismatch"
-        assert self.Q.shape[0] == self.Q.shape[1], "Q must be square"
+        assert self.Q[0].shape == self.Q_terminal.shape, "Q & Q_terminal mismatch"
+        assert self.Q[0].shape[0] == self.Q[0].shape[1], "Q must be square"
         assert self.R.shape[0] == self.R.shape[1], "R must be square"
         assert state_size == self.x_path.shape[1], "Q & x_path mismatch"
         assert action_size == self.u_path.shape[1], "R & u_path mismatch"
@@ -1238,7 +1239,9 @@ class PathQRCostMPC(Cost):
                 "x_path must be 1 longer than u_path"
 
         # Precompute some common constants.
-        self._Q_plus_Q_T = self.Q + self.Q.T
+        self._Q_plus_Q_T = []
+        for i in range(path_length):
+            self._Q_plus_Q_T.append(self.Q[i] + self.Q[i].T)
         self._R_plus_R_T = self.R + self.R.T
         self._Q_plus_Q_T_terminal = self.Q_terminal + self.Q_terminal.T
 
@@ -1256,6 +1259,12 @@ class PathQRCostMPC(Cost):
         u_temp[-1] = self.u_path[-1]
         self.u_path = u_temp
 
+        Q = np.zeros(self.Q)
+        Q[:-1] = self.Q[1:]
+        Q[-1] = self.Q[-1]
+        self.Q = Q
+
+
     def l(self, x, u, i, terminal=False):
         """Instantaneous cost function.
 
@@ -1268,7 +1277,7 @@ class PathQRCostMPC(Cost):
         Returns:
             Instantaneous cost (scalar).
         """
-        Q = self.Q_terminal if terminal else self.Q
+        Q = self.Q_terminal if terminal else self.Q[i]
         R = self.R
         x_diff = x - self.x_path[i]
         squared_x_cost = x_diff.T.dot(Q).dot(x_diff)
@@ -1291,7 +1300,7 @@ class PathQRCostMPC(Cost):
         Returns:
             dl/dx [state_size].
         """
-        Q_plus_Q_T = self._Q_plus_Q_T_terminal if terminal else self._Q_plus_Q_T
+        Q_plus_Q_T = self._Q_plus_Q_T_terminal if terminal else self._Q_plus_Q_T[i]
         x_diff = x - self.x_path[i]
         return x_diff.T.dot(Q_plus_Q_T)
 
@@ -1325,7 +1334,7 @@ class PathQRCostMPC(Cost):
         Returns:
             d^2l/dx^2 [state_size, state_size].
         """
-        return self._Q_plus_Q_T_terminal if terminal else self._Q_plus_Q_T
+        return self._Q_plus_Q_T_terminal if terminal else self._Q_plus_Q_T[i]
 
     def l_ux(self, x, u, i, terminal=False):
         """Second partial derivative of cost function with respect to u and x.
@@ -1339,7 +1348,7 @@ class PathQRCostMPC(Cost):
         Returns:
             d^2l/dudx [action_size, state_size].
         """
-        return np.zeros((self.R.shape[0], self.Q.shape[0]))
+        return np.zeros((self.R.shape[0], self.Q[i].shape[0]))
 
     def l_uu(self, x, u, i, terminal=False):
         """Second partial derivative of cost function with respect to u.
