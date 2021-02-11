@@ -200,15 +200,27 @@ class iLQR(BaseController):
         xs_new = np.zeros_like(xs)
         us_new = np.zeros_like(us)
         xs_new[0] = xs[0].copy()
-
         for i in range(self.N):
             # Eq (12).
             us_new[i] = us[i] + alpha * k[i] + K[i].dot(xs_new[i] - xs[i])
 
             # Eq (8c).
-            xs_new[i + 1] = self.dynamics.f(xs_new[i], us_new[i], i)
+            xs_new[i + 1] = self.dynamics.f(xs_new[i], us_new[i] , i)
+
 
         return xs_new, us_new
+
+    # def _constrain(self, us):
+    #     max_bounds = 10.0
+    #     min_bounds = -10.0
+    #     diff = (max_bounds - min_bounds) / 2.0
+    #     mean = (max_bounds + min_bounds) / 2.0
+    #     us_new = diff * np.tanh(us) + mean
+    #     return us_new
+
+    def _contrain(self, u):
+
+        return np.clip(u, -10.0, 10.0)
 
     def _trajectory_cost(self, xs, us):
         """Computes the given trajectory's cost.
